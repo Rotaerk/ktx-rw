@@ -1,4 +1,4 @@
-# Revision history for ktx-io
+# Revision history for ktx-rw
 
 ## 0.1.0.0 -- YYYY-mm-dd
 
