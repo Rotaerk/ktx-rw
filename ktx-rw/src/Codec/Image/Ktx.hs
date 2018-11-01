@@ -24,8 +24,6 @@ import Data.Word
 parseFileIdentifier :: Parser ()
 parseFileIdentifier = void . AP.string . BS.pack $ [ 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A ]
 
-type TaggedParser e a = T.TaggedT e Parser a
-
 data Endianness = BigEndian | LittleEndian deriving Show
 
 parseEndianness :: Parser Endianness
@@ -34,6 +32,8 @@ parseEndianness =
   LittleEndian <$ AP.string (BS.pack [1,2,3,4])
 
 type Endian e = Reifies e Endianness
+
+type TaggedParser e a = T.TaggedT e Parser a
 
 takeBigEndian :: forall e. Endian e => Int -> TaggedParser e ByteString
 takeBigEndian = T.tagT . toBigEndian . AP.take
@@ -44,10 +44,13 @@ takeBigEndian = T.tagT . toBigEndian . AP.take
         LittleEndian -> fmap BS.reverse
 
 parseWord32 :: forall e. Endian e => TaggedParser e Word32
-parseWord32 = foldl (\n b -> shiftL n 8 .|. b) 0 . fmap fromIntegral . BS.unpack <$> takeBigEndian 4
+parseWord32 = BS.foldl (\n b -> shiftL n 8 .|. fromIntegral b) 0 <$> takeBigEndian 4
 
 takeThrough :: (Word8 -> Bool) -> Parser ByteString
-takeThrough p = AP.scan True $ \satisfied b -> if satisfied then Nothing else Just (p b)
+takeThrough p =
+  AP.scan False $ \case
+    False -> Just . p
+    True -> const Nothing
 
 parseKeyValuePair :: forall e. Endian e => TaggedParser e (ByteString, ByteString)
 parseKeyValuePair = do
