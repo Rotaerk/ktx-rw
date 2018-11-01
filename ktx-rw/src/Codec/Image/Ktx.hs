@@ -1,69 +1,91 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Codec.Image.Ktx where
 
+import Control.Applicative
+import Control.Monad
+import Control.Monad.Loops
+import Control.Monad.Trans.Class
+import qualified Data.Attoparsec.ByteString as AP
+import Data.Attoparsec.ByteString (Parser)
+import Data.Bits
+import qualified Data.ByteString as BS
+import Data.ByteString (ByteString)
+import qualified Data.Functor.Trans.Tagged as T
+import Data.Proxy
+import Data.Reflection
 import Data.Word
 
-type GLEnum = Word32
+parseFileIdentifier :: Parser ()
+parseFileIdentifier = void . AP.string . BS.pack $ [ 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A ]
 
--- GL Formats
-pattern GL_RED = 0x1903
-pattern GL_GREEN = 0x1904
-pattern GL_BLUE = 0x1905
-pattern GL_ALPHA = 0x1906
-pattern GL_LUMINANCE = 0x1909
-pattern GL_SLUMINANCE = 0x8C46
-pattern GL_LUMINANCE_ALPHA = 0x190A
-pattern GL_SLUMINANCE_ALPHA = 0x8C44
-pattern GL_INTENSITY = 0x8049
-pattern GL_RG = 0x8227
-pattern GL_RGB = 0x1907
-pattern GL_BGR = 0x80E0
-pattern GL_RGBA = 0x1908
-pattern GL_BGRA = 0x80E1
-pattern GL_RED_INTEGER = 0x8D94
-pattern GL_GREEN_INTEGER = 0x8D95
-pattern GL_BLUE_INTEGER = 0x8D96
-pattern GL_ALPHA_INTEGER = 0x8D97
-pattern GL_LUMINANCE_INTEGER = 0x8D9C
-pattern GL_LUMINANCE_ALPHA_INTEGER = 0x8D9D
-pattern GL_RG_INTEGER = 0x8228
-pattern GL_RGB_INTEGER = 0x8D98
-pattern GL_BGR_INTEGER = 0x8D9A
-pattern GL_RGBA_INTEGER = 0x8D99
-pattern GL_BGRA_INTEGER = 0x8D9B
-pattern GL_COLOR_INDEX = 0x1900
-pattern GL_STENCIL_INDEX = 0x1901
-pattern GL_DEPTH_COMPONENT = 0x1902
-pattern GL_DEPTH_STENCIL = 0x84F9
+type TaggedParser e a = T.TaggedT e Parser a
 
--- GL Types
-pattern GL_BYTE = 0x1400
-pattern GL_UNSIGNED_BYTE = 0x1401
-pattern GL_SHORT = 0x1402
-pattern GL_UNSIGNED_SHORT = 0x1403
-pattern GL_INT = 0x1404
-pattern GL_UNSIGNED_INT = 0x1405
-pattern GL_INT64 = 0x140E
-pattern GL_UNSIGNED_INT64 = 0x140F
-pattern GL_HALF_FLOAT = 0x140B
-pattern GL_HALF_FLOAT_OES = 0x8D61
-pattern GL_FLOAT = 0x1406
-pattern GL_DOUBLE = 0x140A
-pattern GL_UNSIGNED_BYTE_3_3_2 = 0x8032
-pattern GL_UNSIGNED_BYTE_2_3_3_REV = 0x8362
-pattern GL_UNSIGNED_SHORT_5_6_5 = 0x8363
-pattern GL_UNSIGNED_SHORT_5_6_5_REV = 0x8364
-pattern GL_UNSIGNED_SHORT_4_4_4_4 = 0x8033
-pattern GL_UNSIGNED_SHORT_4_4_4_4_REV = 0x8365
-pattern GL_UNSIGNED_SHORT_5_5_5_1 = 0x8034
-pattern GL_UNSIGNED_SHORT_1_5_5_5_REV = 0x8366
-pattern GL_UNSIGNED_INT_8_8_8_8 = 0x8035
-pattern GL_UNSIGNED_INT_8_8_8_8_REV = 0x8367
-pattern GL_UNSIGNED_INT_10_10_10_2 = 0x8036
-pattern GL_UNSIGNED_INT_2_10_10_10_REV = 0x8368
-pattern GL_UNSIGNED_INT_10F_11F_11F_REV = 0x8C3B
-pattern GL_UNSIGNED_INT_5_9_9_9_REV = 0x8C3E
-pattern GL_UNSIGNED_INT_24_8 = 0x84FA
-pattern GL_FLOAT_32_UNSIGNED_INT_24_8_REV = 0x8DAD
+data Endianness = BigEndian | LittleEndian deriving Show
+
+parseEndianness :: Parser Endianness
+parseEndianness =
+  BigEndian <$ AP.string (BS.pack [4,3,2,1]) <|>
+  LittleEndian <$ AP.string (BS.pack [1,2,3,4])
+
+type Endian e = Reifies e Endianness
+
+takeBigEndian :: forall e. Endian e => Int -> TaggedParser e ByteString
+takeBigEndian = T.tagT . toBigEndian . AP.take
+  where
+    toBigEndian =
+      case reflect (Proxy :: Proxy e) of
+        BigEndian -> id
+        LittleEndian -> fmap BS.reverse
+
+parseWord32 :: forall e. Endian e => TaggedParser e Word32
+parseWord32 = foldl (\n b -> shiftL n 8 .|. b) 0 . fmap fromIntegral . BS.unpack <$> takeBigEndian 4
+
+takeThrough :: (Word8 -> Bool) -> Parser ByteString
+takeThrough p = AP.scan True $ \satisfied b -> if satisfied then Nothing else Just (p b)
+
+parseKeyValuePair :: forall e. Endian e => TaggedParser e (ByteString, ByteString)
+parseKeyValuePair = do
+  keyAndValueByteSize <- fromIntegral <$> parseWord32
+  lift $ do
+    key <- takeThrough (== 0)
+    value <- AP.take (keyAndValueByteSize - BS.length key)
+    replicateM_ (3 - ((keyAndValueByteSize + 3) `mod` 4)) AP.anyWord8
+    return (key, value)
+
+parseKeyValueData :: forall e. Endian e => Int -> TaggedParser e [(ByteString, ByteString)]
+parseKeyValueData =
+  unfoldrM $ \remaining ->
+    if remaining <= 0 then -- if remaining is ever < 0, it's technically an invalid KTX file, but just in case...
+      return Nothing
+    else do
+      pair@(key, value) <- parseKeyValuePair
+      return . Just $ (pair, remaining - BS.length key - BS.length value)
+
+parseKtx :: Parser ktx
+parseKtx = do
+  parseFileIdentifier
+  endianness <- parseEndianness
+  reify endianness $ T.proxyT $
+    replicateM 12 parseWord32 >>=
+      \[
+        glType,
+        glTypeSize,
+        glFormat,
+        glInternalFormat,
+        glBaseInternalFormat,
+        pixelWidth,
+        pixelHeight,
+        pixelDepth,
+        numberOfArrayElements,
+        numberOfFaces,
+        numberOfMipmapLevels,
+        bytesOfKeyValueData
+      ] -> do
+        keyValueData <- parseKeyValueData (fromIntegral bytesOfKeyValueData)
+        return undefined
