@@ -21,7 +21,7 @@ library
     attoparsec,
     bytestring,
     monad-loops,
-    reflection,
+    singletons,
     tagged-transformer,
     transformers,
     base >=4.11 && <4.12

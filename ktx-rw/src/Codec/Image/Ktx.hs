@@ -1,9 +1,16 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Codec.Image.Ktx where
 
@@ -18,33 +25,8 @@ import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import qualified Data.Functor.Trans.Tagged as T
 import Data.Proxy
-import Data.Reflection
+import Data.Singletons.TH
 import Data.Word
-
-parseFileIdentifier :: Parser ()
-parseFileIdentifier = void . AP.string . BS.pack $ [ 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A ]
-
-data Endianness = BigEndian | LittleEndian deriving Show
-
-parseEndianness :: Parser Endianness
-parseEndianness =
-  BigEndian <$ AP.string (BS.pack [4,3,2,1]) <|>
-  LittleEndian <$ AP.string (BS.pack [1,2,3,4])
-
-type Endian e = Reifies e Endianness
-
-type TaggedParser e a = T.TaggedT e Parser a
-
-takeBigEndian :: forall e. Endian e => Int -> TaggedParser e ByteString
-takeBigEndian = T.tagT . toBigEndian . AP.take
-  where
-    toBigEndian =
-      case reflect (Proxy :: Proxy e) of
-        BigEndian -> id
-        LittleEndian -> fmap BS.reverse
-
-parseWord32 :: forall e. Endian e => TaggedParser e Word32
-parseWord32 = BS.foldl (\n b -> shiftL n 8 .|. fromIntegral b) 0 <$> takeBigEndian 4
 
 takeThrough :: (Word8 -> Bool) -> Parser ByteString
 takeThrough p =
@@ -52,7 +34,36 @@ takeThrough p =
     False -> Just . p
     True -> const Nothing
 
-parseKeyValuePair :: forall e. Endian e => TaggedParser e (ByteString, ByteString)
+parseFileIdentifier :: Parser ()
+parseFileIdentifier = void . AP.string . BS.pack $ [ 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A ]
+
+data Endianness = BigEndian | LittleEndian deriving (Show, Eq)
+genSingletons [''Endianness]
+
+parseEndianness :: Parser Endianness
+parseEndianness =
+  BigEndian <$ AP.string (BS.pack [4,3,2,1]) <|>
+  LittleEndian <$ AP.string (BS.pack [1,2,3,4])
+
+type EndianParser (e :: Endianness) a = T.TaggedT e Parser a
+
+class ParseEndian (e :: Endianness) where
+  takeBigEndian :: Int -> EndianParser e ByteString
+
+instance ParseEndian 'BigEndian where
+  takeBigEndian = T.tagT . AP.take
+
+instance ParseEndian 'LittleEndian where
+  takeBigEndian = T.tagT . fmap BS.reverse . AP.take
+
+withEndianness :: Sing e -> (ParseEndian e => EndianParser e a) -> Parser a
+withEndianness SBigEndian = T.untagT
+withEndianness SLittleEndian = T.untagT
+
+parseWord32 :: ParseEndian e => EndianParser e Word32
+parseWord32 = BS.foldl (\n b -> shiftL n 8 .|. fromIntegral b) 0 <$> takeBigEndian 4
+
+parseKeyValuePair :: ParseEndian e => EndianParser e (ByteString, ByteString)
 parseKeyValuePair = do
   keyAndValueByteSize <- fromIntegral <$> parseWord32
   lift $ do
@@ -61,7 +72,7 @@ parseKeyValuePair = do
     replicateM_ (3 - ((keyAndValueByteSize + 3) `mod` 4)) AP.anyWord8
     return (key, value)
 
-parseKeyValueData :: forall e. Endian e => Int -> TaggedParser e [(ByteString, ByteString)]
+parseKeyValueData :: ParseEndian e => Int -> EndianParser e [(ByteString, ByteString)]
 parseKeyValueData =
   unfoldrM $ \remaining ->
     if remaining <= 0 then -- if remaining is ever < 0, it's technically an invalid KTX file, but just in case...
@@ -73,8 +84,8 @@ parseKeyValueData =
 parseKtx :: Parser ktx
 parseKtx = do
   parseFileIdentifier
-  endianness <- parseEndianness
-  reify endianness $ T.proxyT $
+  SomeSing endiannessSing <- toSing <$> parseEndianness
+  withEndianness endiannessSing $
     replicateM 12 parseWord32 >>=
       \[
         glType,
