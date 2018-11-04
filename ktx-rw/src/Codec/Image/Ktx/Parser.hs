@@ -21,6 +21,9 @@ module Codec.Image.Ktx.Parser (
   withRelativeEndianness,
   header,
   keyValueData,
+  anyWord32Endian,
+  mipLevel,
+  textureData,
   module Data.Attoparsec.ByteString
 ) where
 
@@ -37,6 +40,8 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Internal as BSI
 import Data.Functor
 import qualified Data.Functor.Trans.Tagged as T
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Singletons.TH
 import Data.Word
 import Foreign.ForeignPtr (withForeignPtr)
@@ -74,14 +79,20 @@ type EndianParser (e :: RelativeEndianness) a = T.TaggedT e Parser a
 class ParseEndian (e :: RelativeEndianness) where
   anyWord16Endian :: EndianParser e Word16
   anyWord32Endian :: EndianParser e Word32
+  takeWordsEndian :: Int {- Word size -} -> Int {- Word count -} -> EndianParser e ByteString
 
 instance ParseEndian 'SameEndian where
   anyWord16Endian = T.tagT anyWord16
   anyWord32Endian = T.tagT anyWord32
 
+  takeWordsEndian s n = T.tagT $ take (s * n)
+
 instance ParseEndian 'FlipEndian where
   anyWord16Endian = T.tagT $ byteSwap16 <$> anyWord16
   anyWord32Endian = T.tagT $ byteSwap32 <$> anyWord32
+
+  takeWordsEndian 1 n = T.tagT $ take n
+  takeWordsEndian s n = T.tagT $ BS.concat <$> count n (BS.reverse <$> take s)
 
 withRelativeEndianness :: RelativeEndianness -> (forall e. ParseEndian e => EndianParser e a) -> Parser a
 withRelativeEndianness (toSing -> SomeSing reSing) = untagWith reSing
@@ -122,6 +133,9 @@ header =
       header'bytesOfKeyValueData = bytesOfKeyValueData
     }
 
+pad :: Integral n => n -> n -> n
+pad size align = let m = align - 1 in m - ((size + m) `mod` align)
+
 keyValueData :: ParseEndian e => Int -> EndianParser e [(ByteString, ByteString)]
 keyValueData =
   unfoldrM $ \remaining ->
@@ -129,7 +143,7 @@ keyValueData =
       return Nothing
     else do
       keyAndValueByteSize <- fromIntegral <$> anyWord32Endian
-      let paddingSize = 3 - ((keyAndValueByteSize + 3) `mod` 4)
+      let paddingSize = pad keyAndValueByteSize 4
       pair <- lift $ do
         key <- takeThrough (== 0)
         value <- take (keyAndValueByteSize - BS.length key)
@@ -137,94 +151,55 @@ keyValueData =
         return (key, value)
       return . Just $ (pair, remaining - 4 - keyAndValueByteSize - paddingSize) -- The 4 is from the keyAndValueByteSize word32 itself.
 
+mipLevel :: ParseEndian e => Header -> EndianParser e [ByteString]
+mipLevel header = do
+  imageSize <- anyWord32Endian
+  replicateM (if isCubeMap header && not (isArray header) then 6 else 1) $ do
+    pixelData <- takeWordsEndian (fromIntegral glTypeSize) (fromIntegral $ imageSize `quot` glTypeSize)
+    void $ lift $ take (fromIntegral $ pad imageSize 4)
+    return pixelData
+  where
+    glTypeSize = header'glTypeSize header
+
+textureData :: ParseEndian e => Header -> EndianParser e [[ByteString]]
+textureData header = replicateM (fromIntegral . oneIfPalettedFormat header . zeroToOne $ header'numberOfMipmapLevels header) (mipLevel header)
+
+isCubeMap :: Header -> Bool
+isCubeMap = (6 ==) . header'numberOfFaces
+
+isArray :: Header -> Bool
+isArray = (0 <) . header'numberOfArrayElements
+
+isCompressed :: Header -> Bool
+isCompressed = (0 ==) . header'glType
+
+hasPalettedInternalFormat :: Header -> Bool
+hasPalettedInternalFormat = (`Set.member` palettedFormats) . header'glInternalFormat
+  where
+    palettedFormats =
+      Set.fromList [
+        0x8B90, --GL_PALETTE4_RGB8_OES
+        0x8B91, --GL_PALETTE4_RGBA8_OES
+        0x8B92, --GL_PALETTE4_R5_G6_B5_OES
+        0x8B93, --GL_PALETTE4_RGBA4_OES
+        0x8B94, --GL_PALETTE4_RGB5_A1_OES
+        0x8B95, --GL_PALETTE8_RGB8_OES
+        0x8B96, --GL_PALETTE8_RGBA8_OES
+        0x8B97, --GL_PALETTE8_R5_G6_B5_OES
+        0x8B98, --GL_PALETTE8_RGBA4_OES
+        0x8B99  --GL_PALETTE8_RGB5_A1_OES
+      ]
+
+zeroToOne :: Integral n => n -> n
+zeroToOne 0 = 1
+zeroToOne x = x
+
+oneIfPalettedFormat :: Integral n => Header -> n -> n
+oneIfPalettedFormat h = if hasPalettedInternalFormat h then const 1 else id
+
 takeThrough :: (Word8 -> Bool) -> Parser ByteString
 takeThrough p =
   scan False $ \case
     False -> Just . p
     True -> const Nothing
 
-{-
-parseTextureData :: ParseEndian e => Word32 -> Word32 -> Word32 -> Int -> Int -> Int -> Int -> Int -> Int -> EndianParser e [a]
-parseTextureData glType glTypeSize glInternalFormat pixelWidth pixelHeight pixelDepth numFaces numArrayElements numMipmapLevels =
-  replicateM (oneIfPaletteFormat . zeroToOne $ numMipmapLevels) $ do
-    imageSize <- endianParseWord32
-    arrayElements <-
-      replicateM (zeroToOne numArrayElements) $
-        replicateM (oneIfPaletteFormat numFaces) $ do
-          zSlices <-
-            replicateM (zeroToOne pixelDepth) $
-              replicateM (zeroToOne pixelHeight) $
-                replicateM pixelWidth $
-                  return undefined
-          when isCubeMap $ lift $ replicateM_ undefined anyWord8 -- cube padding
-          return undefined
-    lift $ replicateM_ undefined anyWord8 -- mip padding
-    return undefined
-
-  where
-    oneIfPaletteFormat = if Set.member glInternalFormat compressedPalettedTextureInternalFormats then const 1 else id
-    isCubeMap = numFaces == 6
-    isArray = numArrayElements > 0
-    isCompressed = glType == 0
-
-zeroToOne :: Integral n => n -> n
-zeroToOne 0 = 1
-zeroToOne x = x
-
-parseKtx :: Parser ktx
-parseKtx = do
-  parseFileIdentifier
-  SomeSing endiannessSing <- toSing <$> parseEndianness
-  withEndianness endiannessSing $
-    replicateM 12 endianParseWord32 >>=
-      \[
-        glType,
-        glTypeSize,
-        glFormat,
-        glInternalFormat,
-        glBaseInternalFormat,
-        pixelWidth,
-        pixelHeight,
-        pixelDepth,
-        numberOfArrayElements,
-        numberOfFaces,
-        numberOfMipmapLevels,
-        bytesOfKeyValueData
-      ] -> do
-        keyValueData <- parseKeyValueData (fromIntegral bytesOfKeyValueData)
-        let
-          actualNumMipmapLevels =
-            if numberOfMipmapLevels == 0 || Set.member glInternalFormat compressedPalettedTextureInternalFormats then
-              1
-            else
-              numberOfMipmapLevels
-          actualNumArrayElements = if numberOfArrayElements == 0 then 1 else numberOfArrayElements
-          actualNumFaces = if numberOfFaces == 0 then 1 else numberOfFaces
-        return undefined
-
-pattern GL_PALETTE4_RGB8_OES = 0x8B90
-pattern GL_PALETTE4_RGBA8_OES = 0x8B91
-pattern GL_PALETTE4_R5_G6_B5_OES = 0x8B92
-pattern GL_PALETTE4_RGBA4_OES = 0x8B93
-pattern GL_PALETTE4_RGB5_A1_OES = 0x8B94
-pattern GL_PALETTE8_RGB8_OES = 0x8B95
-pattern GL_PALETTE8_RGBA8_OES = 0x8B96
-pattern GL_PALETTE8_R5_G6_B5_OES = 0x8B97
-pattern GL_PALETTE8_RGBA4_OES = 0x8B98
-pattern GL_PALETTE8_RGB5_A1_OES = 0x8B99
-
-compressedPalettedTextureInternalFormats :: Set Word32
-compressedPalettedTextureInternalFormats =
-  Set.fromList [
-    GL_PALETTE4_RGB8_OES,
-    GL_PALETTE4_RGBA8_OES,
-    GL_PALETTE4_R5_G6_B5_OES,
-    GL_PALETTE4_RGBA4_OES,
-    GL_PALETTE4_RGB5_A1_OES,
-    GL_PALETTE8_RGB8_OES,
-    GL_PALETTE8_RGBA8_OES,
-    GL_PALETTE8_R5_G6_B5_OES,
-    GL_PALETTE8_RGBA4_OES,
-    GL_PALETTE8_RGB5_A1_OES
-  ]
--}

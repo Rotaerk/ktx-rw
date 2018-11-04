@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Codec.Image.Ktx where
   
@@ -10,6 +11,7 @@ import Control.Exception
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import Data.Functor
+import Data.Word
 import System.IO
 
 identifierSize :: Int
@@ -32,7 +34,8 @@ throwReadException = throw . ReadException
 parseStrictly :: Parser a -> ByteString -> a
 parseStrictly p i =
   case parse p i of
-    Done _ result -> result
+    Done (BS.length -> 0) result -> result
+    Done bs _ -> throwReadException $ "Did not fully consume input.  Remainder size: " ++ show (BS.length bs)
     Fail rest contexts message -> throwReadException $ "Fail (Rest = '" ++ show rest ++ "', Contexts = " ++ show contexts ++ ", Message = '" ++ message ++ "')"
     Partial _ -> throwReadException $ "Partial parse."
 
@@ -58,3 +61,16 @@ readMetadata filePath =
     let bytesOfKeyValueData = fromIntegral $ header'bytesOfKeyValueData header
     getAndParseStrictly (BS.hGetSome f bytesOfKeyValueData) $
       withRelativeEndianness re (keyValueData bytesOfKeyValueData)
+
+readTextureData :: FilePath -> IO [[ByteString]]
+readTextureData filePath =
+  withFile filePath ReadMode $ \f -> do
+    (re, header) <-
+      getAndParseStrictly (BS.hGetSome f $ identifierSize + endiannessSize + headerSize) $ do
+        fileIdentifier
+        re <- relativeEndianness
+        (re,) <$> withRelativeEndianness re header
+    let bytesOfKeyValueData = fromIntegral $ header'bytesOfKeyValueData header
+    hSeek f RelativeSeek (fromIntegral bytesOfKeyValueData)
+    getAndParseStrictly (BS.hGetContents f) $ do
+      withRelativeEndianness re (textureData header)
