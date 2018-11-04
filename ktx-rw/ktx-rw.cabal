@@ -15,12 +15,16 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     Codec.Image.Ktx
+    Codec.Image.Ktx.Parser
+    Codec.Image.Ktx.Types
   -- other-modules:
   -- other-extensions:
   build-depends:
     attoparsec,
     bytestring,
     containers,
+    directory,
+    -- REMOVE ME:  Just for GHCI convenience.
     monad-loops,
     singletons,
     tagged-transformer,
