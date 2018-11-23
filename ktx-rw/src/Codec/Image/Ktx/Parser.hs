@@ -24,6 +24,11 @@ module Codec.Image.Ktx.Parser (
   anyWord32Endian,
   mipLevel,
   textureData,
+  pad,
+  isCubeMap,
+  isArray,
+  oneIfPalettedFormat,
+  zeroToOne,
   module Data.Attoparsec.ByteString
 ) where
 

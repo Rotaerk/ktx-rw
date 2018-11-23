@@ -1,1 +1,1 @@
--c "cabal new-repl"
+-c "cabal new-repl" -T ":!cabal new-test" -W --reload=test --restart=ktx-rw.cabal

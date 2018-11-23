@@ -2,7 +2,7 @@
 with pkgs;
 let
   inherit (lib) makeLibraryPath;
-  hs = haskell.packages.ghc843;
+  hs = haskell.packages.ghc844;
   tools = [
     hs.ghc
     hs.cabal-install

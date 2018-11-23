@@ -24,7 +24,7 @@ library
     bytestring,
     containers,
     directory,
-    -- REMOVE ME:  Just for GHCI convenience.
+    memory,
     monad-loops,
     singletons,
     tagged-transformer,
@@ -35,10 +35,16 @@ library
   ghc-options: -Wall -Wno-missing-pattern-synonym-signatures -Wno-unused-matches
 
 test-suite ktx-rw-test
-  type: exitcode-stdio-1.0
-  main-is: Test.hs
+  type: detailed-0.9
+  test-module: Test
+  other-modules:
+    Properties
   build-depends:
     ktx-rw,
+    Cabal,
+    directory,
+    filepath,
+    QuickCheck,
     base >= 4.11 && <4.12
   hs-source-dirs: test
   default-language: Haskell2010
