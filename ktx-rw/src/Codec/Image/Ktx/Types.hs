@@ -4,6 +4,7 @@ import Data.Word
 
 data Header =
   Header {
+    header'relativeEndianness :: RelativeEndianness,
     header'glType :: Word32,
     header'glTypeSize :: Word32,
     header'glFormat :: Word32,

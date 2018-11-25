@@ -17,6 +17,7 @@ library
     Codec.Image.Ktx
     Codec.Image.Ktx.Parser
     Codec.Image.Ktx.Types
+    Codec.Image.Ktx.Read
   -- other-modules:
   -- other-extensions:
   build-depends:
@@ -24,6 +25,8 @@ library
     bytestring,
     containers,
     directory,
+    exceptions,
+    indexed,
     memory,
     monad-loops,
     singletons,
