@@ -11,6 +11,7 @@
 module Codec.Image.Ktx.Read where
 
 import Codec.Image.Ktx.Types
+import Control.Exception
 import Control.Monad
 import Control.Monad.Catch
 import Control.Monad.IO.Class
@@ -238,8 +239,8 @@ getPixelDataSize =
     headerSize = 13 * word32Size
     imageSizeFieldSize = word32Size
 
-readAllDataInto :: (MonadIO m, MonadBinaryRead m) => Ptr Word8 -> KtxReadWithHeaderT m Position'TextureData Position'End BufferRegions
-readAllDataInto ptr =
+readAllDataInto :: (MonadIO m, MonadBinaryRead m) => Ptr Word8 -> Size -> KtxReadWithHeaderT m Position'TextureData Position'End BufferRegions
+readAllDataInto ptr bufferSize =
   getHeader >>>= \h ->
   let
     numMipmapLevels = fromIntegral $ effectiveNumberOfMipmapLevels h
@@ -252,43 +253,43 @@ readAllDataInto ptr =
       correctForEndianness' offsetPtr readSize
       return offset
   in
-    liftToKtxReadT . evalBufferWriteTOn ptr $
-      if isNonArrayCubeMap h then
-        fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
-          imageSize <- liftToBufferWriteT $ fromIntegral <$> readWord32
-          [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readToBuffer' (alignTo 4 imageSize)
-          return (imageSize, o1, o2, o3, o4, o5, o6)
-      else
-        fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
-          imageSize <- liftToBufferWriteT  $ fromIntegral <$> readWord32
-          offset <- readToBuffer' (alignTo 4 imageSize)
-          return (imageSize, offset)
+    liftToKtxReadT . evalBufferWriteTOn ptr bufferSize $
+    if isNonArrayCubeMap h then
+      fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
+        imageSize <- liftToBufferWriteT $ fromIntegral <$> readWord32
+        [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readToBuffer' (alignTo 4 imageSize)
+        return (imageSize, o1, o2, o3, o4, o5, o6)
+    else
+      fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
+        imageSize <- liftToBufferWriteT  $ fromIntegral <$> readWord32
+        offset <- readToBuffer' (alignTo 4 imageSize)
+        return (imageSize, offset)
 
-type BufferWriteT m = StateT Offset (ReaderT (Ptr Word8) m)
+type BufferWriteEnv = (Ptr Word8, Size)
+type BufferWriteT m = StateT Offset (ReaderT BufferWriteEnv m)
 
-evalBufferWriteTOn :: Monad m => Ptr Word8 -> BufferWriteT m a -> m a
-evalBufferWriteTOn bufferPtr bf = runReaderT (evalStateT bf 0) bufferPtr
+evalBufferWriteTOn :: Monad m => Ptr Word8 -> Size -> BufferWriteT m a -> m a
+evalBufferWriteTOn bufferPtr size bf = runReaderT (evalStateT bf 0) (bufferPtr, size)
 
 liftToBufferWriteT :: Monad m => m a -> BufferWriteT m a
 liftToBufferWriteT = lift . lift
 
-writeBufferWith :: Monad m => (Ptr Word8 -> m (Size, a)) -> BufferWriteT m (Offset, Size, a)
+writeBufferWith :: Monad m => (Ptr Word8 -> Size -> m (Size, a)) -> BufferWriteT m (Offset, a)
 writeBufferWith write = do
-  bufferPtr <- lift ask
+  (bufferPtr, bufferSize) <- lift ask
   offset <- get
-  (size, a) <- liftToBufferWriteT $ write (bufferPtr `plusPtr` offset)
-  put (offset + size)
-  return (offset, size, a)
+  (numBytesWritten, a) <- liftToBufferWriteT $ write (bufferPtr `plusPtr` offset) (bufferSize - offset)
+  put (offset + numBytesWritten)
+  return (offset, a)
 
 readToBuffer :: (MonadIO m, MonadBinaryRead m) => Size -> BufferWriteT m (Offset, Ptr Word8)
-readToBuffer readSize = do
-  (offset, numBytesRead, offsetPtr) <-
-    writeBufferWith $ \offsetPtr -> do
-      numBytesRead <- brTryReadToBuf offsetPtr readSize
-      when (numBytesRead < readSize) $ throwReadException "Unexpected EOF."
-      when (numBytesRead > readSize) $ throwReadException "Unexpectedly read more bytes than requested."
-      return (numBytesRead, offsetPtr)
-  return (offset, offsetPtr)
+readToBuffer readSize =
+  writeBufferWith $ \offsetPtr bufferCapacity -> do
+    when (readSize > bufferCapacity) $ throwReadException "Buffer not large enough for this operation."
+    numBytesRead <- brTryReadToBuf offsetPtr readSize
+    assert (numBytesRead <= readSize) $ return ()
+    when (numBytesRead < readSize) $ throwReadException "Unexpected EOF."
+    return (numBytesRead, offsetPtr)
 
 correctForEndianness :: MonadIO m => Size -> RelativeEndianness -> Ptr Word8 -> Size -> m ()
 correctForEndianness wordSize = \case
