@@ -244,19 +244,24 @@ readAllDataInto ptr =
   let
     numMipmapLevels = fromIntegral $ effectiveNumberOfMipmapLevels h
     re = header'relativeEndianness h
-    readToBuffer = readToBufferWith re (fromIntegral $ header'glTypeSize h)
+    wordSize = fromIntegral $ header'glTypeSize h
     readWord32 = brReadWord32 re
+    correctForEndianness' = correctForEndianness wordSize re
+    readToBuffer' readSize = do
+      (offset, offsetPtr) <- readToBuffer readSize
+      correctForEndianness' offsetPtr readSize
+      return offset
   in
     liftToKtxReadT . evalBufferWriteTOn ptr $
       if isNonArrayCubeMap h then
         fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
           imageSize <- liftToBufferWriteT $ fromIntegral <$> readWord32
-          [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readToBuffer (alignTo 4 imageSize)
+          [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readToBuffer' (alignTo 4 imageSize)
           return (imageSize, o1, o2, o3, o4, o5, o6)
       else
         fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
           imageSize <- liftToBufferWriteT  $ fromIntegral <$> readWord32
-          offset <- readToBuffer (alignTo 4 imageSize)
+          offset <- readToBuffer' (alignTo 4 imageSize)
           return (imageSize, offset)
 
 type BufferWriteT m = StateT Offset (ReaderT (Ptr Word8) m)
@@ -267,34 +272,35 @@ evalBufferWriteTOn bufferPtr bf = runReaderT (evalStateT bf 0) bufferPtr
 liftToBufferWriteT :: Monad m => m a -> BufferWriteT m a
 liftToBufferWriteT = lift . lift
 
-writeBufferWith :: Monad m => (Ptr Word8 -> m Size) -> BufferWriteT m (Offset, Size)
+writeBufferWith :: Monad m => (Ptr Word8 -> m (Size, a)) -> BufferWriteT m (Offset, Size, a)
 writeBufferWith write = do
   bufferPtr <- lift ask
   offset <- get
-  size <- liftToBufferWriteT $ write (bufferPtr `plusPtr` offset)
+  (size, a) <- liftToBufferWriteT $ write (bufferPtr `plusPtr` offset)
   put (offset + size)
-  return (offset, size)
+  return (offset, size, a)
 
-readToBufferWith :: (MonadIO m, MonadBinaryRead m) => RelativeEndianness -> Size -> Size -> BufferWriteT m Offset
-readToBufferWith re wordSize =
-  let
-    byteSwapWordsInPlace =
-      case wordSize of
-        1 -> const . const $ return ()
-        2 -> mapInPlace byteSwap16 . castPtr
-        4 -> mapInPlace byteSwap32 . castPtr
-        _ -> undefined
-    endiannessCorrection =
-      case re of
-        SameEndian -> const . const $ return ()
-        FlipEndian -> \offsetPtr readSize -> liftIO $ byteSwapWordsInPlace offsetPtr (readSize `quot` wordSize)
-  in
-  \readSize -> do
-    fmap fst . writeBufferWith $ \offsetPtr -> do
+readToBuffer :: (MonadIO m, MonadBinaryRead m) => Size -> BufferWriteT m (Offset, Ptr Word8)
+readToBuffer readSize = do
+  (offset, numBytesRead, offsetPtr) <-
+    writeBufferWith $ \offsetPtr -> do
       numBytesRead <- brTryReadToBuf offsetPtr readSize
       when (numBytesRead < readSize) $ throwReadException "Unexpected EOF."
-      endiannessCorrection offsetPtr readSize
-      return numBytesRead
+      when (numBytesRead > readSize) $ throwReadException "Unexpectedly read more bytes than requested."
+      return (numBytesRead, offsetPtr)
+  return (offset, offsetPtr)
+
+correctForEndianness :: MonadIO m => Size -> RelativeEndianness -> Ptr Word8 -> Size -> m ()
+correctForEndianness wordSize = \case
+  SameEndian -> const . const $ return ()
+  FlipEndian -> \ptr numBytes -> liftIO $ byteSwapWordsInPlace wordSize ptr (numBytes `quot` wordSize)
+
+byteSwapWordsInPlace :: Size -> Ptr Word8 -> Int -> IO ()
+byteSwapWordsInPlace = \case
+  1 -> const . const $ return ()
+  2 -> mapInPlace byteSwap16 . castPtr
+  4 -> mapInPlace byteSwap32 . castPtr
+  _ -> undefined
 
 mapInPlace :: Storable a => (a -> a) -> Ptr a -> Int -> IO ()
 mapInPlace f ptr count =
