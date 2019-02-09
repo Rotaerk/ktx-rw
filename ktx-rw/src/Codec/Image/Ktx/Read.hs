@@ -247,17 +247,17 @@ readAllDataInto ptr =
     re = header'relativeEndianness header
     readToBuffer' = readToBuffer re
   in
-    liftToKtxReadT $ do
-      imageSize <- fromIntegral <$> brReadWord32 re
-      evalBufferWriteTOn ptr wordSize $
-        if isCubeMap header && not (isArray header) then
-          fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
-            [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readToBuffer' (alignTo 4 imageSize)
-            return (imageSize, o1, o2, o3, o4, o5, o6)
-        else
-          fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
-            offset <- readToBuffer' (alignTo 4 imageSize)
-            return (imageSize, offset)
+    liftToKtxReadT . evalBufferWriteTOn ptr wordSize $
+      if isCubeMap header && not (isArray header) then
+        fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
+          imageSize <- liftToBufferWriteT $ fromIntegral <$> brReadWord32 re
+          [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readToBuffer' (alignTo 4 imageSize)
+          return (imageSize, o1, o2, o3, o4, o5, o6)
+      else
+        fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
+          imageSize <- liftToBufferWriteT  $ fromIntegral <$> brReadWord32 re
+          offset <- readToBuffer' (alignTo 4 imageSize)
+          return (imageSize, offset)
 
 type BufferWriteEnv = (Ptr Word8, Int)
 type BufferWriteT m = StateT Offset (ReaderT BufferWriteEnv m)
@@ -265,11 +265,14 @@ type BufferWriteT m = StateT Offset (ReaderT BufferWriteEnv m)
 evalBufferWriteTOn :: Monad m => Ptr Word8 -> Int -> BufferWriteT m a -> m a
 evalBufferWriteTOn bufferPtr wordSize bf = runReaderT (evalStateT bf 0) (bufferPtr, wordSize)
 
+liftToBufferWriteT :: Monad m => m a -> BufferWriteT m a
+liftToBufferWriteT = lift . lift
+
 writeBufferWith :: Monad m => (Ptr Word8 -> Int -> m Size) -> BufferWriteT m (Offset, Size)
 writeBufferWith write = do
   (bufferPtr, wordSize) <- lift ask
   offset <- get
-  size <- lift . lift $ write (bufferPtr `plusPtr` offset) wordSize
+  size <- liftToBufferWriteT $ write (bufferPtr `plusPtr` offset) wordSize
   put (offset + size)
   return (offset, size)
 
