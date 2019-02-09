@@ -27,6 +27,9 @@ isCubeMap = (6 ==) . header'numberOfFaces
 isArray :: Header -> Bool
 isArray = (0 <) . header'numberOfArrayElements
 
+isNonArrayCubeMap :: Header -> Bool
+isNonArrayCubeMap h = isCubeMap h && not (isArray h)
+
 isCompressed :: Header -> Bool
 isCompressed = (0 ==) . header'glType
 
@@ -46,5 +49,12 @@ hasPalettedInternalFormat = (`Set.member` palettedFormats) . header'glInternalFo
         0x8B98, --GL_PALETTE8_RGBA4_OES
         0x8B99  --GL_PALETTE8_RGB5_A1_OES
       ]
+
+effectiveNumberOfMipmapLevels :: Header -> Word32
+effectiveNumberOfMipmapLevels h = if hasPalettedInternalFormat h then 1 else replace 0 1 $ header'numberOfMipmapLevels h
+
+replace :: Eq a => a -> a -> a -> a
+replace match replacement value | value == match = replacement
+replace _ _ value = value
 
 data RelativeEndianness = SameEndian | FlipEndian deriving (Show, Eq)
