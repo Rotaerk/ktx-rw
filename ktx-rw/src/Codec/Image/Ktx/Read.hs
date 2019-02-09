@@ -13,8 +13,12 @@ module Codec.Image.Ktx.Read where
 import Codec.Image.Ktx.Types
 import Control.Monad
 import Control.Monad.Catch
+import Control.Monad.IO.Class
 import Control.Monad.Indexed
 import Control.Monad.Loops
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State.Lazy
 import Data.Attoparsec.ByteString
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
@@ -38,7 +42,8 @@ data Position =
   Position'Identifier |
   Position'Header |
   Position'Metadata |
-  Position'MipLevel Nat
+  Position'TextureData |
+  Position'End
 
 data ReadException = ReadException String deriving (Eq, Show, Read)
 
@@ -50,6 +55,8 @@ throwReadException = throwM . ReadException
 
 newtype KtxReadT (m :: * -> *) (s :: (*, Position)) (s' :: (*, Position)) a =
   KtxReadT { runKtxReadT :: Fst s -> m (a, Fst s') }
+
+type KtxReadWithHeaderT m s s' = KtxReadT m '(Header, s) '(Header, s')
 
 liftToKtxReadT :: Monad m => m a -> KtxReadT m '(h, p) '(h, p') a
 liftToKtxReadT m = KtxReadT $ \h -> (,h) <$> m
@@ -101,11 +108,18 @@ bsToWord32With FlipEndian = byteSwap32 . unsafeFromByteString
 
 newtype KtxReadTBookmark (m :: * -> *) (p :: Position) = KtxReadTBookmark (BinaryReadBookmark m)
 
+createBookmark :: MonadBinaryRead m => KtxReadT m '(h, p) '(h, p) (KtxReadTBookmark m p)
+createBookmark = KtxReadTBookmark <<$>> liftToKtxReadT brCreateBookmark
+
+goToBookmark :: MonadBinaryRead m => KtxReadTBookmark m p' -> KtxReadT m '(h, p) '(h, p') ()
+goToBookmark (KtxReadTBookmark brb) = liftToKtxReadT $ brGoToBookmark brb
+
 readAndCheckIdentifier :: MonadBinaryRead m => KtxReadT m '(h, Position'Identifier) '(h, Position'Header) ()
 readAndCheckIdentifier = liftToKtxReadT $ do
   bs <- brTryReadBS 12
   when (bs /= identifier) $ throwReadException "KTX file identifier not found."
   return ()
+
   where
     identifier = BS.pack $ [ 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A ]
 
@@ -152,13 +166,13 @@ readHeader = KtxReadT $ const $ do
 readHeader_ :: MonadBinaryRead m => KtxReadT m '(h, Position'Header) '(Header, Position'Metadata) ()
 readHeader_ = const () <<$>> readHeader
 
-getHeader :: Applicative m => KtxReadT m '(Header, p) '(Header, p') Header
+getHeader :: Applicative m => KtxReadWithHeaderT m p p' Header
 getHeader = KtxReadT $ \h -> pure (h, h)
 
-skipMetadata :: MonadBinaryRead m => KtxReadT m '(Header, Position'Metadata) '(Header, Position'MipLevel 0) ()
+skipMetadata :: MonadBinaryRead m => KtxReadWithHeaderT m Position'Metadata Position'TextureData ()
 skipMetadata = header'bytesOfKeyValueData <<$>> getHeader >>>= liftToKtxReadT . brSeekRel . fromIntegral
 
-readMetadata :: MonadBinaryRead m => KtxReadT m '(Header, Position'Metadata) '(Header, Position'MipLevel 0) [(ByteString, ByteString)]
+readMetadata :: MonadBinaryRead m => KtxReadWithHeaderT m Position'Metadata Position'TextureData [(ByteString, ByteString)]
 readMetadata =
   getHeader >>>= \header ->
   let
@@ -198,11 +212,93 @@ parseMetadata re =
   where
     parseAnyWord32 = parseAnyWord32With re
 
-readMipLevel :: MonadBinaryRead m => KtxReadT m '(Header, Position'MipLevel n) '(Header, Position'MipLevel (n+1)) ()
-readMipLevel = undefined -- TODO
+type Offset = Int
+type Size = Int
 
-createBookmark :: MonadBinaryRead m => KtxReadT m '(h, p) '(h, p) (KtxReadTBookmark m p)
-createBookmark = KtxReadTBookmark <<$>> liftToKtxReadT brCreateBookmark
+type SimpleBufferRegion = (Size, Offset)
+type NonArrayCubeMapBufferRegion = (Size, Offset, Offset, Offset, Offset, Offset, Offset)
 
-goToBookmark :: MonadBinaryRead m => KtxReadTBookmark m p' -> KtxReadT m '(h, p) '(h, p') ()
-goToBookmark (KtxReadTBookmark brb) = liftToKtxReadT $ brGoToBookmark brb
+data BufferRegions =
+  SimpleBufferRegions [SimpleBufferRegion] |
+  NonArrayCubeMapBufferRegions [NonArrayCubeMapBufferRegion]
+
+getPixelDataSize :: MonadBinaryRead m => KtxReadWithHeaderT m p p Integer
+getPixelDataSize =
+  getHeader >>>= \header ->
+  liftToKtxReadT $ do
+    totalDataSize <- brDataSize
+    let
+      metadataSize = fromIntegral . header'bytesOfKeyValueData $ header
+      numMipLevels = fromIntegral . header'numberOfMipmapLevels $ header
+    return $ totalDataSize - identifierSize - headerSize - metadataSize - numMipLevels * imageSizeFieldSize
+
+  where
+    word32Size = 4
+    identifierSize = 12
+    headerSize = 13 * word32Size
+    imageSizeFieldSize = word32Size
+
+readAllDataInto :: (MonadIO m, MonadBinaryRead m) => Ptr Word8 -> KtxReadWithHeaderT m Position'TextureData Position'End BufferRegions
+readAllDataInto ptr =
+  getHeader >>>= \header ->
+  let
+    numMipmapLevels = if hasPalettedInternalFormat header then 1 else fromIntegral . replace 0 1 $ header'numberOfMipmapLevels header
+    wordSize = fromIntegral $ header'glTypeSize header
+    re = header'relativeEndianness header
+    readToBuffer' = readToBuffer re
+  in
+    liftToKtxReadT $ do
+      imageSize <- fromIntegral <$> brReadWord32 re
+      evalBufferWriteTOn ptr wordSize $
+        if isCubeMap header && not (isArray header) then
+          fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
+            [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readToBuffer' (alignTo 4 imageSize)
+            return (imageSize, o1, o2, o3, o4, o5, o6)
+        else
+          fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
+            offset <- readToBuffer' (alignTo 4 imageSize)
+            return (imageSize, offset)
+
+type BufferWriteEnv = (Ptr Word8, Int)
+type BufferWriteT m = StateT Offset (ReaderT BufferWriteEnv m)
+
+evalBufferWriteTOn :: Monad m => Ptr Word8 -> Int -> BufferWriteT m a -> m a
+evalBufferWriteTOn bufferPtr wordSize bf = runReaderT (evalStateT bf 0) (bufferPtr, wordSize)
+
+writeBufferWith :: Monad m => (Ptr Word8 -> Int -> m Size) -> BufferWriteT m (Offset, Size)
+writeBufferWith write = do
+  (bufferPtr, wordSize) <- lift ask
+  offset <- get
+  size <- lift . lift $ write (bufferPtr `plusPtr` offset) wordSize
+  put (offset + size)
+  return (offset, size)
+
+readToBuffer :: (MonadIO m, MonadBinaryRead m) => RelativeEndianness -> Size -> BufferWriteT m Offset
+readToBuffer re size = do
+  fmap fst . writeBufferWith $ \offsetPtr wordSize -> do
+    numBytesRead <- brTryReadToBuf offsetPtr size
+    when (numBytesRead < size) $ throwReadException "Unexpected EOF."
+    when (re == FlipEndian) $ liftIO $ byteSwapWordsInPlace wordSize offsetPtr (size `quot` wordSize)
+    return size
+
+byteSwapWordsInPlace :: Int -> Ptr a -> Int -> IO ()
+byteSwapWordsInPlace = \case
+  1 -> const . const $ return ()
+  2 -> mapInPlace byteSwap16 . castPtr
+  4 -> mapInPlace byteSwap32 . castPtr
+  _ -> undefined
+
+mapInPlace :: Storable a => (a -> a) -> Ptr a -> Int -> IO ()
+mapInPlace f ptr count =
+  forM_ [0 .. count - 1] $ \offset ->
+    f <$> peekElemOff ptr offset >>= pokeElemOff ptr offset
+
+alignTo :: Integral n => n -> n -> n
+alignTo b n =
+  case n `rem` b of
+    0 -> n
+    x -> n + b - x
+
+replace :: Eq a => a -> a -> a -> a
+replace match replacement value | value == match = replacement
+replace _ _ value = value
