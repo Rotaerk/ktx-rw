@@ -13,27 +13,22 @@ module Codec.Image.Ktx.Read where
 import Codec.Image.Ktx.Types
 import Control.Exception
 import Control.Monad
+import Control.Monad.BinaryRead.Class as BR
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Indexed
 import Control.Monad.Loops
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.State.Lazy
+import Control.Monad.Trans.BufferWriter
 import Data.Attoparsec.ByteString
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Internal as BSI
+import Data.ByteString.Local
 import Data.Functor
 import Data.Functor.Indexed
-import Data.Kind
 import Data.Word
-import Foreign.ForeignPtr
 import Foreign.Ptr
 import Foreign.Storable
-import GHC.TypeLits
 import System.IO
-import System.IO.Unsafe
 
 import Prelude hiding (take)
 
@@ -46,13 +41,13 @@ data Position =
   Position'TextureData |
   Position'End
 
-data ReadException = ReadException String deriving (Eq, Show, Read)
+data KtxReadException = KtxReadException String deriving (Eq, Show, Read)
 
-instance Exception ReadException where
-  displayException (ReadException message) = "Invalid KTX file: " ++ message
+instance Exception KtxReadException where
+  displayException (KtxReadException message) = "Invalid KTX file: " ++ message
 
-throwReadException :: MonadThrow m => String -> m a
-throwReadException = throwM . ReadException
+throwKtxReadException :: MonadThrow m => String -> m a
+throwKtxReadException = throwM . KtxReadException
 
 newtype KtxReadT (m :: * -> *) (s :: (*, Position)) (s' :: (*, Position)) a =
   KtxReadT { runKtxReadT :: Fst s -> m (a, Fst s') }
@@ -79,95 +74,54 @@ instance Monad m => IxMonad (KtxReadT m) where
     (a, h') <- runKtxReadT ka h
     runKtxReadT (atkb a) h'
 
-class MonadThrow m => MonadBinaryRead m where
-  type BinaryReadBookmark m
-  brDataSize :: m Integer
-  brCreateBookmark :: m (BinaryReadBookmark m)
-  brGoToBookmark :: BinaryReadBookmark m -> m ()
-  brSeekRel :: Integer -> m ()
-  brTryReadToBuf :: Ptr a -> Int -> m Int
-  brTryReadBS :: Int -> m ByteString
-
-unsafeFromByteString :: Storable a => ByteString -> a
-unsafeFromByteString bs =
-  unsafeDupablePerformIO $ do
-    let (fp, offset, _) = BSI.toForeignPtr bs
-    withForeignPtr fp $ \p -> peekByteOff p offset
-
-brReadBS :: MonadBinaryRead m => Int -> m ByteString
-brReadBS size = do
-  bs <- brTryReadBS size
-  when (BS.length bs /= size) $ throwReadException "Unexpected EOF."
-  return bs
-
-brReadWord32 :: MonadBinaryRead m => RelativeEndianness -> m Word32
-brReadWord32 re = bsToWord32With re <$> brReadBS 4
-
-bsToWord32With :: RelativeEndianness -> ByteString -> Word32
-bsToWord32With SameEndian = unsafeFromByteString
-bsToWord32With FlipEndian = byteSwap32 . unsafeFromByteString
-
 newtype KtxReadTBookmark (m :: * -> *) (p :: Position) = KtxReadTBookmark (BinaryReadBookmark m)
 
 createBookmark :: MonadBinaryRead m => KtxReadT m '(h, p) '(h, p) (KtxReadTBookmark m p)
-createBookmark = KtxReadTBookmark <<$>> liftToKtxReadT brCreateBookmark
+createBookmark = KtxReadTBookmark <<$>> liftToKtxReadT BR.createBookmark
 
 goToBookmark :: MonadBinaryRead m => KtxReadTBookmark m p' -> KtxReadT m '(h, p) '(h, p') ()
-goToBookmark (KtxReadTBookmark brb) = liftToKtxReadT $ brGoToBookmark brb
+goToBookmark (KtxReadTBookmark brb) = liftToKtxReadT $ BR.goToBookmark brb
 
-readAndCheckIdentifier :: MonadBinaryRead m => KtxReadT m '(h, Position'Identifier) '(h, Position'Header) ()
+readAndCheckIdentifier :: MonadBinaryRead m => KtxReadT m '(h, 'Position'Identifier) '(h, 'Position'Header) ()
 readAndCheckIdentifier = liftToKtxReadT $ do
-  bs <- brTryReadBS 12
-  when (bs /= identifier) $ throwReadException "KTX file identifier not found."
+  bs <- tryReadBS 12
+  when (bs /= identifier) $ throwKtxReadException "KTX file identifier not found."
 
   where
     identifier = BS.pack $ [ 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A ]
 
-readHeader :: MonadBinaryRead m => KtxReadT m '(h, Position'Header) '(Header, Position'Metadata) Header
+readHeader :: MonadBinaryRead m => KtxReadT m '(h, 'Position'Header) '(Header, 'Position'Metadata) Header
 readHeader = KtxReadT $ const $ do
   re <-
-    brReadWord32 SameEndian >>= \case
+    readWord32FromEndianness SameEndian >>= \case
       0x04030201 -> return SameEndian
       0x01020304 -> return FlipEndian
-      _ -> throwReadException "Invalid endianness indicator."
-  let r32 = brReadWord32 re
-  header <- Header re <$> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32
+      _ -> throwKtxReadException "Invalid endianness indicator."
+  let r = readWord32FromEndianness re
+  header <- Header re <$> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r
   return (header, header)
 
-readHeader_ :: MonadBinaryRead m => KtxReadT m '(h, Position'Header) '(Header, Position'Metadata) ()
+readHeader_ :: MonadBinaryRead m => KtxReadT m '(h, 'Position'Header) '(Header, 'Position'Metadata) ()
 readHeader_ = const () <<$>> readHeader
 
 getHeader :: Applicative m => KtxReadWithHeaderT m p p' Header
 getHeader = KtxReadT $ \h -> pure (h, h)
 
-skipMetadata :: MonadBinaryRead m => KtxReadWithHeaderT m Position'Metadata Position'TextureData ()
-skipMetadata = header'bytesOfKeyValueData <<$>> getHeader >>>= liftToKtxReadT . brSeekRel . fromIntegral
+skipMetadata :: MonadBinaryRead m => KtxReadWithHeaderT m 'Position'Metadata 'Position'TextureData ()
+skipMetadata = header'bytesOfKeyValueData <<$>> getHeader >>>= liftToKtxReadT . seekRel . fromIntegral
 
-readMetadata :: MonadBinaryRead m => KtxReadWithHeaderT m Position'Metadata Position'TextureData [(ByteString, ByteString)]
+readMetadata :: MonadBinaryRead m => KtxReadWithHeaderT m 'Position'Metadata 'Position'TextureData [(ByteString, ByteString)]
 readMetadata =
   getHeader >>>= \header ->
   let
     size = fromIntegral . header'bytesOfKeyValueData $ header
     re = header'relativeEndianness header
   in
-    liftToKtxReadT $ parse (parseMetadata re size) <$> brReadBS size >>= \case
+    liftToKtxReadT $ parse (parseMetadata re size) <$> readBS size >>= \case
       Done (BS.length -> 0) result -> return result
-      Done (BS.length -> len) _ -> throwReadException $ "Metadata parser did not fully consume input.  This shouldn't happen.  Implementation broken."
-      Fail rest contexts message -> throwReadException $ "Malformed metadata."
-      Partial _ -> throwReadException $ "Metadata parser expecting more input.  This shouldn't happen.  Implementation broken."
-
--- The amount of padding required to align data of a given size with a given boundary
-padding :: Integral n => n -> n -> n
-padding size boundary = let maxPadding = boundary - 1 in maxPadding - ((size + maxPadding) `mod` boundary)
-
-parseAnyWord32With :: RelativeEndianness -> Parser Word32
-parseAnyWord32With re = bsToWord32With re <$> take 4
-
-takeThrough :: (Word8 -> Bool) -> Parser ByteString
-takeThrough p =
-  scan False $ \case
-    False -> Just . p
-    True -> const Nothing
+      Done (BS.length -> len) _ -> throwKtxReadException $ "Metadata parser did not fully consume input.  This shouldn't happen.  Implementation broken."
+      Fail rest contexts message -> throwKtxReadException $ "Malformed metadata."
+      Partial _ -> throwKtxReadException $ "Metadata parser expecting more input.  This shouldn't happen.  Implementation broken."
 
 parseMetadata :: RelativeEndianness -> Int -> Parser [(ByteString, ByteString)]
 parseMetadata re =
@@ -175,30 +129,18 @@ parseMetadata re =
     if remaining <= 0 then -- if remaining is ever < 0, it's technically an invalid KTX file, but handling just in case...
       return Nothing
     else do
-      keyAndValueByteSize <- fromIntegral <$> parseAnyWord32
+      keyAndValueByteSize <- fromIntegral <$> parseAnyWord32FromEndianness re
       key <- takeThrough (== 0)
       value <- take (keyAndValueByteSize - BS.length key)
       let paddingSize = padding keyAndValueByteSize 4
       void $ take paddingSize
       return . Just $ ((key, value), remaining - 4 - keyAndValueByteSize - paddingSize) -- The 4 is from the keyAndValueByteSize word32 itself.
-  where
-    parseAnyWord32 = parseAnyWord32With re
-
-type Offset = Int
-type Size = Int
-
-type SimpleBufferRegion = (Size, Offset)
-type NonArrayCubeMapBufferRegion = (Size, Offset, Offset, Offset, Offset, Offset, Offset)
-
-data BufferRegions =
-  SimpleBufferRegions [SimpleBufferRegion] |
-  NonArrayCubeMapBufferRegions [NonArrayCubeMapBufferRegion]
 
 getPixelDataSize :: MonadBinaryRead m => KtxReadWithHeaderT m p p Integer
 getPixelDataSize =
   getHeader >>>= \h ->
   liftToKtxReadT $ do
-    totalDataSize <- brDataSize
+    totalDataSize <- dataSize
     let
       metadataSize = fromIntegral $ header'bytesOfKeyValueData h
       numMipLevels = fromIntegral $ header'numberOfMipmapLevels h
@@ -210,59 +152,40 @@ getPixelDataSize =
     headerSize = 13 * word32Size
     imageSizeFieldSize = word32Size
 
-readAllDataInto :: (MonadIO m, MonadBinaryRead m) => Ptr Word8 -> Size -> KtxReadWithHeaderT m Position'TextureData Position'End BufferRegions
-readAllDataInto ptr bufferSize =
+type SimpleBufferRegion = (Size, Offset)
+type NonArrayCubeMapBufferRegion = (Size, Offset, Offset, Offset, Offset, Offset, Offset)
+
+data BufferRegions =
+  SimpleBufferRegions [SimpleBufferRegion] |
+  NonArrayCubeMapBufferRegions [NonArrayCubeMapBufferRegion]
+
+readPixelDataToBuffer :: (MonadIO m, MonadBinaryRead m) => Ptr Word8 -> Size -> KtxReadWithHeaderT m 'Position'TextureData 'Position'End BufferRegions
+readPixelDataToBuffer bufferPtr bufferSize =
   getHeader >>>= \h ->
   let
     numMipmapLevels = fromIntegral $ effectiveNumberOfMipmapLevels h
     re = header'relativeEndianness h
-    readWord32 = brReadWord32 re
+    readWord32' = readWord32FromEndianness re
     readWordsToBuffer' = readWordsToBuffer re (fromIntegral $ header'glTypeSize h)
   in
-    liftToKtxReadT . evalBufferWriteTOn ptr bufferSize $
-    if isNonArrayCubeMap h then
-      fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
-        imageSize <- liftToBufferWriteT $ fromIntegral <$> readWord32
-        [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readWordsToBuffer' (alignTo 4 imageSize)
-        return (imageSize, o1, o2, o3, o4, o5, o6)
-    else
-      fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
-        imageSize <- liftToBufferWriteT  $ fromIntegral <$> readWord32
-        offset <- readWordsToBuffer' (alignTo 4 imageSize)
-        return (imageSize, offset)
-
-type BufferWriteEnv = (Ptr Word8, Size)
-type BufferWriteT m = StateT Offset (ReaderT BufferWriteEnv m)
-
-evalBufferWriteTOn :: Monad m => Ptr Word8 -> Size -> BufferWriteT m a -> m a
-evalBufferWriteTOn bufferPtr size bf = runReaderT (evalStateT bf 0) (bufferPtr, size)
-
-liftToBufferWriteT :: Monad m => m a -> BufferWriteT m a
-liftToBufferWriteT = lift . lift
-
-writeBufferWith :: Monad m => (Ptr Word8 -> Size -> m (Size, a)) -> BufferWriteT m (Offset, a)
-writeBufferWith write = do
-  (bufferPtr, bufferSize) <- lift ask
-  offset <- get
-  (numBytesWritten, a) <- liftToBufferWriteT $ write (bufferPtr `plusPtr` offset) (bufferSize - offset)
-  put (offset + numBytesWritten)
-  return (offset, a)
-
-readToBuffer :: (MonadIO m, MonadBinaryRead m) => Size -> BufferWriteT m (Offset, Ptr Word8)
-readToBuffer readSize =
-  writeBufferWith $ \offsetPtr bufferCapacity -> do
-    when (readSize > bufferCapacity) $ throwReadException "Buffer not large enough for this operation."
-    numBytesRead <- brTryReadToBuf offsetPtr readSize
-    assert (numBytesRead <= readSize) $ return ()
-    when (numBytesRead < readSize) $ throwReadException "Unexpected EOF."
-    return (numBytesRead, offsetPtr)
+  liftToKtxReadT . evalBufferWriterTOn bufferPtr bufferSize $
+  if isNonArrayCubeMap h then
+    fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
+      imageSize <- liftToBufferWriterT $ fromIntegral <$> readWord32'
+      [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readWordsToBuffer' (alignTo 4 imageSize)
+      return (imageSize, o1, o2, o3, o4, o5, o6)
+  else
+    fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
+      imageSize <- liftToBufferWriterT  $ fromIntegral <$> readWord32'
+      offset <- readWordsToBuffer' (alignTo 4 imageSize)
+      return (imageSize, offset)
 
 readWordsToBuffer ::
   (MonadIO m, MonadBinaryRead m) =>
   RelativeEndianness ->
-  Size -> -- word size
-  Size -> -- read size
-  BufferWriteT m Offset
+  Size -> -- bytes per word
+  Size -> -- bytes to read
+  BufferWriterT m Offset
 readWordsToBuffer = \case
   SameEndian -> const $ fmap fst . readToBuffer
   FlipEndian -> \wordSize readSize -> do
@@ -278,8 +201,8 @@ byteSwapWordsInPlace = \case
   _ -> undefined
 
 mapInPlace :: Storable a => (a -> a) -> Ptr a -> Int -> IO ()
-mapInPlace f ptr count =
-  forM_ [0 .. count - 1] $ \offset ->
+mapInPlace f ptr elemCount =
+  forM_ [0 .. elemCount - 1] $ \offset ->
     f <$> peekElemOff ptr offset >>= pokeElemOff ptr offset
 
 alignTo :: Integral n => n -> n -> n
@@ -287,3 +210,26 @@ alignTo b n =
   case n `rem` b of
     0 -> n
     x -> n + b - x
+
+-- The amount of padding required to align data of a given size with a given boundary
+padding :: Integral n => n -> n -> n
+padding size boundary = let maxPadding = boundary - 1 in maxPadding - ((size + maxPadding) `mod` boundary)
+
+takeThrough :: (Word8 -> Bool) -> Parser ByteString
+takeThrough p =
+  scan False $ \case
+    False -> Just . p
+    True -> const Nothing
+
+readWord32FromEndianness :: MonadBinaryRead m => RelativeEndianness -> m Word32
+readWord32FromEndianness re = makeSameEndian re <$> readWord32
+
+makeSameEndian :: RelativeEndianness -> Word32 -> Word32
+makeSameEndian SameEndian = id
+makeSameEndian FlipEndian = byteSwap32
+
+parseAnyWord32 :: Parser Word32
+parseAnyWord32 = unsafeFromByteString <$> take 4
+
+parseAnyWord32FromEndianness :: RelativeEndianness -> Parser Word32
+parseAnyWord32FromEndianness re = makeSameEndian re <$> parseAnyWord32

@@ -14,10 +14,13 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:
-    Codec.Image.Ktx
-    Codec.Image.Ktx.Parser
+--    Codec.Image.Ktx
+--    Codec.Image.Ktx.Parser
     Codec.Image.Ktx.Types
     Codec.Image.Ktx.Read
+    Control.Monad.BinaryRead.Class
+    Control.Monad.Trans.BufferWriter
+    Data.ByteString.Local
   -- other-modules:
   -- other-extensions:
   build-depends:
