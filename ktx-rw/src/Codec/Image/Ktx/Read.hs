@@ -119,7 +119,6 @@ readAndCheckIdentifier :: MonadBinaryRead m => KtxReadT m '(h, Position'Identifi
 readAndCheckIdentifier = liftToKtxReadT $ do
   bs <- brTryReadBS 12
   when (bs /= identifier) $ throwReadException "KTX file identifier not found."
-  return ()
 
   where
     identifier = BS.pack $ [ 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A ]
@@ -131,37 +130,8 @@ readHeader = KtxReadT $ const $ do
       0x04030201 -> return SameEndian
       0x01020304 -> return FlipEndian
       _ -> throwReadException "Invalid endianness indicator."
-  header <-
-    replicateM 12 (brReadWord32 re) <&>
-    \[
-      glType,
-      glTypeSize,
-      glFormat,
-      glInternalFormat,
-      glBaseInternalFormat,
-      pixelWidth,
-      pixelHeight,
-      pixelDepth,
-      numberOfArrayElements,
-      numberOfFaces,
-      numberOfMipmapLevels,
-      bytesOfKeyValueData
-    ] ->
-      Header {
-        header'relativeEndianness = re,
-        header'glType = glType,
-        header'glTypeSize = glTypeSize,
-        header'glFormat = glFormat,
-        header'glInternalFormat = glInternalFormat,
-        header'glBaseInternalFormat = glBaseInternalFormat,
-        header'pixelWidth = pixelWidth,
-        header'pixelHeight = pixelHeight,
-        header'pixelDepth = pixelDepth,
-        header'numberOfArrayElements = numberOfArrayElements,
-        header'numberOfFaces = numberOfFaces,
-        header'numberOfMipmapLevels = numberOfMipmapLevels,
-        header'bytesOfKeyValueData = bytesOfKeyValueData
-      }
+  let r32 = brReadWord32 re
+  header <- Header re <$> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32 <*> r32
   return (header, header)
 
 readHeader_ :: MonadBinaryRead m => KtxReadT m '(h, Position'Header) '(Header, Position'Metadata) ()
@@ -186,8 +156,9 @@ readMetadata =
       Fail rest contexts message -> throwReadException $ "Malformed metadata."
       Partial _ -> throwReadException $ "Metadata parser expecting more input.  This shouldn't happen.  Implementation broken."
 
-pad :: Integral n => n -> n -> n
-pad size align = let m = align - 1 in m - ((size + m) `mod` align)
+-- The amount of padding required to align data of a given size with a given boundary
+padding :: Integral n => n -> n -> n
+padding size boundary = let maxPadding = boundary - 1 in maxPadding - ((size + maxPadding) `mod` boundary)
 
 parseAnyWord32With :: RelativeEndianness -> Parser Word32
 parseAnyWord32With re = bsToWord32With re <$> take 4
@@ -207,7 +178,7 @@ parseMetadata re =
       keyAndValueByteSize <- fromIntegral <$> parseAnyWord32
       key <- takeThrough (== 0)
       value <- take (keyAndValueByteSize - BS.length key)
-      let paddingSize = pad keyAndValueByteSize 4
+      let paddingSize = padding keyAndValueByteSize 4
       void $ take paddingSize
       return . Just $ ((key, value), remaining - 4 - keyAndValueByteSize - paddingSize) -- The 4 is from the keyAndValueByteSize word32 itself.
   where
@@ -245,24 +216,19 @@ readAllDataInto ptr bufferSize =
   let
     numMipmapLevels = fromIntegral $ effectiveNumberOfMipmapLevels h
     re = header'relativeEndianness h
-    wordSize = fromIntegral $ header'glTypeSize h
     readWord32 = brReadWord32 re
-    correctForEndianness' = correctForEndianness wordSize re
-    readToBuffer' readSize = do
-      (offset, offsetPtr) <- readToBuffer readSize
-      correctForEndianness' offsetPtr readSize
-      return offset
+    readWordsToBuffer' = readWordsToBuffer re (fromIntegral $ header'glTypeSize h)
   in
     liftToKtxReadT . evalBufferWriteTOn ptr bufferSize $
     if isNonArrayCubeMap h then
       fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
         imageSize <- liftToBufferWriteT $ fromIntegral <$> readWord32
-        [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readToBuffer' (alignTo 4 imageSize)
+        [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readWordsToBuffer' (alignTo 4 imageSize)
         return (imageSize, o1, o2, o3, o4, o5, o6)
     else
       fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
         imageSize <- liftToBufferWriteT  $ fromIntegral <$> readWord32
-        offset <- readToBuffer' (alignTo 4 imageSize)
+        offset <- readWordsToBuffer' (alignTo 4 imageSize)
         return (imageSize, offset)
 
 type BufferWriteEnv = (Ptr Word8, Size)
@@ -291,10 +257,18 @@ readToBuffer readSize =
     when (numBytesRead < readSize) $ throwReadException "Unexpected EOF."
     return (numBytesRead, offsetPtr)
 
-correctForEndianness :: MonadIO m => Size -> RelativeEndianness -> Ptr Word8 -> Size -> m ()
-correctForEndianness wordSize = \case
-  SameEndian -> const . const $ return ()
-  FlipEndian -> \ptr numBytes -> liftIO $ byteSwapWordsInPlace wordSize ptr (numBytes `quot` wordSize)
+readWordsToBuffer ::
+  (MonadIO m, MonadBinaryRead m) =>
+  RelativeEndianness ->
+  Size -> -- word size
+  Size -> -- read size
+  BufferWriteT m Offset
+readWordsToBuffer = \case
+  SameEndian -> const $ fmap fst . readToBuffer
+  FlipEndian -> \wordSize readSize -> do
+    (offset, offsetPtr) <- readToBuffer readSize
+    liftIO $ byteSwapWordsInPlace wordSize (castPtr offsetPtr) (readSize `quot` wordSize)
+    return offset
 
 byteSwapWordsInPlace :: Size -> Ptr Word8 -> Int -> IO ()
 byteSwapWordsInPlace = \case
