@@ -19,7 +19,7 @@ type Size = Int
 type BufferWriterEnv = (Ptr Word8, Size)
 type BufferWriterT m = StateT Offset (ReaderT BufferWriterEnv m)
 
-data BufferWriteException = BufferWriteException String deriving (Eq, Show, Read)
+newtype BufferWriteException = BufferWriteException String deriving (Eq, Show, Read)
 
 instance Exception BufferWriteException where
   displayException (BufferWriteException message) = message

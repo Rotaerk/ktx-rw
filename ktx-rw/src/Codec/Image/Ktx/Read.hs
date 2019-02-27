@@ -3,6 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -14,6 +15,7 @@ import Codec.Image.Ktx.Types
 import Control.Exception
 import Control.Monad
 import Control.Monad.BinaryRead.Class as BR
+import Control.Monad.BinaryRead.File
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Monad.Indexed
@@ -26,11 +28,24 @@ import Data.ByteString.Local
 import Data.Functor
 import Data.Functor.Indexed
 import Data.Word
+import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable
 import System.IO
 
 import Prelude hiding (take)
+
+readKtxFile :: FilePath -> KtxReadT BinaryFileRead '(Header, 'Position'Metadata) '(Header, p') a -> IO a
+readKtxFile filePath customRead = runBinaryFileReadOn filePath . runKtxReadT $ readAndCheckIdentifier >>> readHeader_ >>> customRead
+
+poc :: IO (Ptr Word8, Int, BufferRegions)
+poc =
+  readKtxFile "./textures/crate01_color_height_rgba.ktx" $
+  skipMetadata >>>
+  getTextureDataSize >>>= \(fromIntegral -> bufferSize) ->
+  iliftIO (mallocArray bufferSize) >>>= \bufferPtr ->
+  readTextureDataToBuffer bufferPtr bufferSize >>>= \bufferRegions ->
+  ireturn (bufferPtr, bufferSize, bufferRegions)
 
 type family Fst (xy :: (x,y)) :: x where Fst '(x,y) = x
 
@@ -41,7 +56,7 @@ data Position =
   Position'TextureData |
   Position'End
 
-data KtxReadException = KtxReadException String deriving (Eq, Show, Read)
+newtype KtxReadException = KtxReadException String deriving (Eq, Show, Read)
 
 instance Exception KtxReadException where
   displayException (KtxReadException message) = "Invalid KTX file: " ++ message
@@ -50,29 +65,35 @@ throwKtxReadException :: MonadThrow m => String -> m a
 throwKtxReadException = throwM . KtxReadException
 
 newtype KtxReadT (m :: * -> *) (s :: (*, Position)) (s' :: (*, Position)) a =
-  KtxReadT { runKtxReadT :: Fst s -> m (a, Fst s') }
+  KtxReadT { unKtxReadT :: Fst s -> m (a, Fst s') }
 
 type KtxReadWithHeaderT m s s' = KtxReadT m '(Header, s) '(Header, s')
+
+runKtxReadT :: Functor m => KtxReadT m '((), 'Position'Identifier) '(h', p') a -> m a
+runKtxReadT k = fst <$> unKtxReadT k ()
 
 liftToKtxReadT :: Monad m => m a -> KtxReadT m '(h, p) '(h, p') a
 liftToKtxReadT m = KtxReadT $ \h -> (,h) <$> m
 
+iliftIO :: MonadIO m => IO a -> KtxReadT m s s a
+iliftIO io = KtxReadT $ \h -> (,h) <$> liftIO io
+
 instance Functor m => IxFunctor (KtxReadT m) where
-  imap atb ka = KtxReadT $ \h -> runKtxReadT ka h <&> \(a, h') -> (atb a, h')
+  imap atb ka = KtxReadT $ \h -> unKtxReadT ka h <&> \(a, h') -> (atb a, h')
 
 instance Applicative m => IxPointed (KtxReadT m) where
   ireturn a = KtxReadT $ \h -> pure (a, h)
 
 instance Monad m => IxApplicative (KtxReadT m) where
   iap katb ka = KtxReadT $ \h -> do
-    (atb, h') <- runKtxReadT katb h
-    (a, h'') <- runKtxReadT ka h'
+    (atb, h') <- unKtxReadT katb h
+    (a, h'') <- unKtxReadT ka h'
     return (atb a, h'')
 
 instance Monad m => IxMonad (KtxReadT m) where
   ibind atkb ka = KtxReadT $ \h -> do
-    (a, h') <- runKtxReadT ka h
-    runKtxReadT (atkb a) h'
+    (a, h') <- unKtxReadT ka h
+    unKtxReadT (atkb a) h'
 
 newtype KtxReadTBookmark (m :: * -> *) (p :: Position) = KtxReadTBookmark (BinaryReadBookmark m)
 
@@ -136,8 +157,8 @@ parseMetadata re =
       void $ take paddingSize
       return . Just $ ((key, value), remaining - 4 - keyAndValueByteSize - paddingSize) -- The 4 is from the keyAndValueByteSize word32 itself.
 
-getPixelDataSize :: MonadBinaryRead m => KtxReadWithHeaderT m p p Integer
-getPixelDataSize =
+getTextureDataSize :: MonadBinaryRead m => KtxReadWithHeaderT m p p Integer
+getTextureDataSize =
   getHeader >>>= \h ->
   liftToKtxReadT $ do
     totalDataSize <- dataSize
@@ -159,8 +180,8 @@ data BufferRegions =
   SimpleBufferRegions [SimpleBufferRegion] |
   NonArrayCubeMapBufferRegions [NonArrayCubeMapBufferRegion]
 
-readPixelDataToBuffer :: (MonadIO m, MonadBinaryRead m) => Ptr Word8 -> Size -> KtxReadWithHeaderT m 'Position'TextureData 'Position'End BufferRegions
-readPixelDataToBuffer bufferPtr bufferSize =
+readTextureDataToBuffer :: (MonadIO m, MonadBinaryRead m) => Ptr Word8 -> Size -> KtxReadWithHeaderT m 'Position'TextureData 'Position'End BufferRegions
+readTextureDataToBuffer bufferPtr bufferSize =
   getHeader >>>= \h ->
   let
     numMipmapLevels = fromIntegral $ effectiveNumberOfMipmapLevels h
@@ -233,3 +254,6 @@ parseAnyWord32 = unsafeFromByteString <$> take 4
 
 parseAnyWord32FromEndianness :: RelativeEndianness -> Parser Word32
 parseAnyWord32FromEndianness re = makeSameEndian re <$> parseAnyWord32
+
+(>>>) :: IxMonad m => m i j a -> m j k b -> m i k b
+a >>> b = a >>>= const b

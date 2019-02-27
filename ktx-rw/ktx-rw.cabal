@@ -19,6 +19,7 @@ library
     Codec.Image.Ktx.Types
     Codec.Image.Ktx.Read
     Control.Monad.BinaryRead.Class
+    Control.Monad.BinaryRead.File
     Control.Monad.Trans.BufferWriter
     Data.ByteString.Local
   -- other-modules:
