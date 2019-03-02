@@ -18,9 +18,8 @@ library
     Codec.Image.Ktx.Read
     Control.Monad.BufferWriter
     Control.Monad.FileReader
+  other-modules:
     Data.ByteString.Local
-  -- other-modules:
-  -- other-extensions:
   build-depends:
     attoparsec,
     bytestring,
@@ -32,7 +31,7 @@ library
     base >=4.11 && <4.12
   hs-source-dirs: src
   default-language: Haskell2010
-  ghc-options: -Wall -Wno-missing-pattern-synonym-signatures -Wno-unused-matches
+  ghc-options: -Wall
 
 test-suite ktx-rw-test
   type: detailed-0.9

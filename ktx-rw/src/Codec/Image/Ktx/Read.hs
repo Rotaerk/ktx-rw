@@ -3,7 +3,23 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Codec.Image.Ktx.Read where
+module Codec.Image.Ktx.Read (
+  readKtxFile,
+  KtxBodyReaderT(),
+  buildKtxBodyReaderT,
+  runKtxBodyReaderT,
+  KtxFileReadException(..),
+  throwKtxFileReadException,
+  SimpleBufferRegion,
+  NonArrayCubeMapBufferRegion,
+  BufferRegions(..),
+  readAndCheckIdentifier,
+  readHeader,
+  skipMetadata,
+  readMetadata,
+  getTextureDataSize,
+  readTextureDataIntoBuffer
+) where
 
 import Codec.Image.Ktx.Types
 import Control.Exception
@@ -47,9 +63,6 @@ buildKtxBodyReaderT = KtxBodyReaderT . ReaderT
 runKtxBodyReaderT :: KtxBodyReaderT m a -> Header -> m a
 runKtxBodyReaderT = runReaderT . unKtxBodyReaderT
 
-runKtxBodyReaderTOn :: Header -> KtxBodyReaderT m a -> m a
-runKtxBodyReaderTOn = flip runKtxBodyReaderT
-
 instance MonadTrans KtxBodyReaderT where
   lift = KtxBodyReaderT . lift
 
@@ -69,6 +82,13 @@ instance Exception KtxFileReadException where
 
 throwKtxFileReadException :: MonadThrow m => String -> m a
 throwKtxFileReadException = throwM . KtxFileReadException
+
+type SimpleBufferRegion = (Size, Offset)
+type NonArrayCubeMapBufferRegion = (Size, Offset, Offset, Offset, Offset, Offset, Offset)
+
+data BufferRegions =
+  SimpleBufferRegions [SimpleBufferRegion] |
+  NonArrayCubeMapBufferRegions [NonArrayCubeMapBufferRegion]
 
 readAndCheckIdentifier :: MonadFileReader m => m ()
 readAndCheckIdentifier = do
@@ -99,8 +119,8 @@ readMetadata = buildKtxBodyReaderT $ \h ->
   in
   parse (parseMetadata re size) <$> readBytesFromFile size >>= \case
     Done (BS.length -> 0) result -> return result
-    Done (BS.length -> len) _ -> throwKtxFileReadException $ "Metadata parser did not fully consume input.  This shouldn't happen.  Implementation broken."
-    Fail rest contexts message -> throwKtxFileReadException $ "Malformed metadata."
+    Done _ _ -> throwKtxFileReadException $ "Metadata parser did not fully consume input.  This shouldn't happen.  Implementation broken."
+    Fail _ _ _ -> throwKtxFileReadException $ "Malformed metadata."
     Partial _ -> throwKtxFileReadException $ "Metadata parser expecting more input.  This shouldn't happen.  Implementation broken."
 
 getTextureDataSize :: MonadFileReader m => KtxBodyReaderT m Size
@@ -115,13 +135,6 @@ getTextureDataSize = buildKtxBodyReaderT $ \h ->
     identifierSize = 12
     headerSize = 13 * word32Size
     imageSizeFieldSize = word32Size
-
-type SimpleBufferRegion = (Size, Offset)
-type NonArrayCubeMapBufferRegion = (Size, Offset, Offset, Offset, Offset, Offset, Offset)
-
-data BufferRegions =
-  SimpleBufferRegions [SimpleBufferRegion] |
-  NonArrayCubeMapBufferRegions [NonArrayCubeMapBufferRegion]
 
 readTextureDataIntoBuffer :: MonadFileReader m => BufferWriterT (KtxBodyReaderT m) BufferRegions
 readTextureDataIntoBuffer = do

@@ -1,7 +1,18 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Control.Monad.BufferWriter where
+module Control.Monad.BufferWriter (
+  Offset,
+  Size,
+  Buffer,
+  BufferWriterT(),
+  BufferWriteException(..),
+  throwBufferWriteException,
+  buildBufferWriterT,
+  runBufferWriterT,
+  evalBufferWriterT,
+  writeToBufferWith
+) where
 
 import Control.Exception
 import Control.Monad.Catch
@@ -35,14 +46,8 @@ buildBufferWriterT f = BufferWriterT . ReaderT $ StateT . f
 runBufferWriterT :: Monad m => BufferWriterT m a -> Buffer -> Offset -> m (a, Offset)
 runBufferWriterT bw = runStateT . (runReaderT . unBufferWriterT) bw
 
-runBufferWriterTOn :: Monad m => Buffer -> Offset -> BufferWriterT m a -> m (a, Offset)
-runBufferWriterTOn buffer initialOffset bw = runBufferWriterT bw buffer initialOffset
-
 evalBufferWriterT :: Monad m => BufferWriterT m a -> Buffer -> Offset -> m a
 evalBufferWriterT bw buffer initialOffset = fst <$> runBufferWriterT bw buffer initialOffset
-
-evalBufferWriterTOn :: Monad m => Buffer -> Offset -> BufferWriterT m a -> m a
-evalBufferWriterTOn buffer initialOffset bw = fst <$> runBufferWriterTOn buffer initialOffset bw
 
 writeToBufferWith :: Monad m => (Ptr Word8 -> Size -> m (a, Size)) -> BufferWriterT m (a, Offset)
 writeToBufferWith write =

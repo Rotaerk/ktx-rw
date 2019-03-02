@@ -1,6 +1,16 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Control.Monad.FileReader where
+module Control.Monad.FileReader (
+  MonadFileReader(..),
+  FileReadException(..),
+  throwFileReadException,
+  readBytesFromFileInto,
+  readBytesFromFile,
+  readWord32FromFile,
+  FileReaderT(),
+  buildFileReaderT,
+  runFileReaderT
+) where
 
 import Control.Exception
 import Control.Monad.Catch
@@ -54,9 +64,6 @@ buildFileReaderT = FileReaderT . ReaderT
 
 runFileReaderT :: FileReaderT m a -> Handle -> m a
 runFileReaderT = runReaderT . unFileReaderT
-
-runFileReaderTOn :: Handle -> FileReaderT m a -> m a
-runFileReaderTOn = flip runFileReaderT
 
 instance (MonadIO m, MonadThrow m) => MonadFileReader (FileReaderT m) where
   getFileSize = buildFileReaderT $ liftIO . hFileSize
