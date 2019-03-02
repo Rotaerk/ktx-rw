@@ -14,8 +14,6 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:
---    Codec.Image.Ktx
---    Codec.Image.Ktx.Parser
     Codec.Image.Ktx.Types
     Codec.Image.Ktx.Read
     Control.Monad.BufferWriter
