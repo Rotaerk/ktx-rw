@@ -1,12 +1,5 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Codec.Image.Ktx.Read where
@@ -14,159 +7,96 @@ module Codec.Image.Ktx.Read where
 import Codec.Image.Ktx.Types
 import Control.Exception
 import Control.Monad
-import Control.Monad.BinaryRead.Class as BR
-import Control.Monad.BinaryRead.File
+import Control.Monad.BufferWriter
 import Control.Monad.Catch
+import Control.Monad.FileReader
 import Control.Monad.IO.Class
-import Control.Monad.Indexed
 import Control.Monad.Loops
-import Control.Monad.Trans.BufferWriter
+import Control.Monad.Reader
 import Data.Attoparsec.ByteString
 import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 import Data.ByteString.Local
 import Data.Functor
-import Data.Functor.Indexed
 import Data.Word
-import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable
 import System.IO
 
 import Prelude hiding (take)
 
-readKtxFile :: FilePath -> KtxReadT BinaryFileRead '(Header, 'Position'Metadata) '(Header, p') a -> IO a
-readKtxFile filePath customRead = runBinaryFileReadOn filePath . runKtxReadT $ readAndCheckIdentifier >>> readHeader_ >>> customRead
+newtype KtxBodyReaderT m a = KtxBodyReaderT { unKtxBodyReaderT :: ReaderT Header m a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadReader Header)
 
-poc :: IO (Ptr Word8, Int, BufferRegions)
-poc =
-  readKtxFile "./textures/crate01_color_height_rgba.ktx" $
-  skipMetadata >>>
-  getTextureDataSize >>>= \(fromIntegral -> bufferSize) ->
-  iliftIO (mallocArray bufferSize) >>>= \bufferPtr ->
-  readTextureDataToBuffer bufferPtr bufferSize >>>= \bufferRegions ->
-  ireturn (bufferPtr, bufferSize, bufferRegions)
+buildKtxBodyReaderT :: (Header -> m a) -> KtxBodyReaderT m a
+buildKtxBodyReaderT = KtxBodyReaderT . ReaderT
 
-type family Fst (xy :: (x,y)) :: x where Fst '(x,y) = x
+runKtxBodyReaderT :: KtxBodyReaderT m a -> Header -> m a
+runKtxBodyReaderT = runReaderT . unKtxBodyReaderT
 
-data Position =
-  Position'Identifier |
-  Position'Header |
-  Position'Metadata |
-  Position'TextureData |
-  Position'End
+runKtxBodyReaderTOn :: Header -> KtxBodyReaderT m a -> m a
+runKtxBodyReaderTOn = flip runKtxBodyReaderT
 
-newtype KtxReadException = KtxReadException String deriving (Eq, Show, Read)
+instance MonadTrans KtxBodyReaderT where
+  lift = KtxBodyReaderT . lift
 
-instance Exception KtxReadException where
-  displayException (KtxReadException message) = "Invalid KTX file: " ++ message
+instance MonadFileReader m => MonadFileReader (KtxBodyReaderT m) where
+  getFileSize = lift getFileSize
+  isEndOfFile = lift isEndOfFile
+  getPosnInFile = lift getPosnInFile
+  setPosnInFile = lift . setPosnInFile
+  seekInFile seekMode i = lift $ seekInFile seekMode i
+  tryReadBytesFromFileInto buffer n = lift $ tryReadBytesFromFileInto buffer n
+  tryReadBytesFromFile = lift . tryReadBytesFromFile
 
-throwKtxReadException :: MonadThrow m => String -> m a
-throwKtxReadException = throwM . KtxReadException
+newtype KtxFileReadException = KtxFileReadException String deriving (Eq, Show, Read)
 
-newtype KtxReadT (m :: * -> *) (s :: (*, Position)) (s' :: (*, Position)) a =
-  KtxReadT { unKtxReadT :: Fst s -> m (a, Fst s') }
+instance Exception KtxFileReadException where
+  displayException (KtxFileReadException message) = "Invalid KTX file: " ++ message
 
-type KtxReadWithHeaderT m s s' = KtxReadT m '(Header, s) '(Header, s')
+throwKtxFileReadException :: MonadThrow m => String -> m a
+throwKtxFileReadException = throwM . KtxFileReadException
 
-runKtxReadT :: Functor m => KtxReadT m '((), 'Position'Identifier) '(h', p') a -> m a
-runKtxReadT k = fst <$> unKtxReadT k ()
-
-liftToKtxReadT :: Monad m => m a -> KtxReadT m '(h, p) '(h, p') a
-liftToKtxReadT m = KtxReadT $ \h -> (,h) <$> m
-
-iliftIO :: MonadIO m => IO a -> KtxReadT m s s a
-iliftIO io = KtxReadT $ \h -> (,h) <$> liftIO io
-
-instance Functor m => IxFunctor (KtxReadT m) where
-  imap atb ka = KtxReadT $ \h -> unKtxReadT ka h <&> \(a, h') -> (atb a, h')
-
-instance Applicative m => IxPointed (KtxReadT m) where
-  ireturn a = KtxReadT $ \h -> pure (a, h)
-
-instance Monad m => IxApplicative (KtxReadT m) where
-  iap katb ka = KtxReadT $ \h -> do
-    (atb, h') <- unKtxReadT katb h
-    (a, h'') <- unKtxReadT ka h'
-    return (atb a, h'')
-
-instance Monad m => IxMonad (KtxReadT m) where
-  ibind atkb ka = KtxReadT $ \h -> do
-    (a, h') <- unKtxReadT ka h
-    unKtxReadT (atkb a) h'
-
-newtype KtxReadTBookmark (m :: * -> *) (p :: Position) = KtxReadTBookmark (BinaryReadBookmark m)
-
-createBookmark :: MonadBinaryRead m => KtxReadT m '(h, p) '(h, p) (KtxReadTBookmark m p)
-createBookmark = KtxReadTBookmark <<$>> liftToKtxReadT BR.createBookmark
-
-goToBookmark :: MonadBinaryRead m => KtxReadTBookmark m p' -> KtxReadT m '(h, p) '(h, p') ()
-goToBookmark (KtxReadTBookmark brb) = liftToKtxReadT $ BR.goToBookmark brb
-
-readAndCheckIdentifier :: MonadBinaryRead m => KtxReadT m '(h, 'Position'Identifier) '(h, 'Position'Header) ()
-readAndCheckIdentifier = liftToKtxReadT $ do
-  bs <- tryReadBS 12
-  when (bs /= identifier) $ throwKtxReadException "KTX file identifier not found."
+readAndCheckIdentifier :: MonadFileReader m => m ()
+readAndCheckIdentifier = do
+  bs <- tryReadBytesFromFile 12
+  when (bs /= identifier) $ throwKtxFileReadException "KTX file identifier not found."
 
   where
     identifier = BS.pack $ [ 0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A ]
 
-readHeader :: MonadBinaryRead m => KtxReadT m '(h, 'Position'Header) '(Header, 'Position'Metadata) Header
-readHeader = KtxReadT $ const $ do
+readHeader :: MonadFileReader m => m Header
+readHeader = do
   re <-
-    readWord32FromEndianness SameEndian >>= \case
+    readWord32FromFileWithEndianness SameEndian >>= \case
       0x04030201 -> return SameEndian
       0x01020304 -> return FlipEndian
-      _ -> throwKtxReadException "Invalid endianness indicator."
-  let r = readWord32FromEndianness re
-  header <- Header re <$> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r
-  return (header, header)
+      _ -> throwKtxFileReadException "Invalid endianness indicator."
+  let r = readWord32FromFileWithEndianness re
+  Header re <$> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r <*> r
 
-readHeader_ :: MonadBinaryRead m => KtxReadT m '(h, 'Position'Header) '(Header, 'Position'Metadata) ()
-readHeader_ = const () <<$>> readHeader
+skipMetadata :: MonadFileReader m => KtxBodyReaderT m ()
+skipMetadata = buildKtxBodyReaderT $ seekInFile RelativeSeek . fromIntegral . header'bytesOfKeyValueData
 
-getHeader :: Applicative m => KtxReadWithHeaderT m p p' Header
-getHeader = KtxReadT $ \h -> pure (h, h)
-
-skipMetadata :: MonadBinaryRead m => KtxReadWithHeaderT m 'Position'Metadata 'Position'TextureData ()
-skipMetadata = header'bytesOfKeyValueData <<$>> getHeader >>>= liftToKtxReadT . seekRel . fromIntegral
-
-readMetadata :: MonadBinaryRead m => KtxReadWithHeaderT m 'Position'Metadata 'Position'TextureData [(ByteString, ByteString)]
-readMetadata =
-  getHeader >>>= \header ->
+readMetadata :: MonadFileReader m => KtxBodyReaderT m [(ByteString, ByteString)]
+readMetadata = buildKtxBodyReaderT $ \h ->
   let
-    size = fromIntegral . header'bytesOfKeyValueData $ header
-    re = header'relativeEndianness header
+    size = fromIntegral . header'bytesOfKeyValueData $ h
+    re = header'relativeEndianness h
   in
-    liftToKtxReadT $ parse (parseMetadata re size) <$> readBS size >>= \case
-      Done (BS.length -> 0) result -> return result
-      Done (BS.length -> len) _ -> throwKtxReadException $ "Metadata parser did not fully consume input.  This shouldn't happen.  Implementation broken."
-      Fail rest contexts message -> throwKtxReadException $ "Malformed metadata."
-      Partial _ -> throwKtxReadException $ "Metadata parser expecting more input.  This shouldn't happen.  Implementation broken."
+  parse (parseMetadata re size) <$> readBytesFromFile size >>= \case
+    Done (BS.length -> 0) result -> return result
+    Done (BS.length -> len) _ -> throwKtxFileReadException $ "Metadata parser did not fully consume input.  This shouldn't happen.  Implementation broken."
+    Fail rest contexts message -> throwKtxFileReadException $ "Malformed metadata."
+    Partial _ -> throwKtxFileReadException $ "Metadata parser expecting more input.  This shouldn't happen.  Implementation broken."
 
-parseMetadata :: RelativeEndianness -> Int -> Parser [(ByteString, ByteString)]
-parseMetadata re =
-  unfoldrM $ \remaining ->
-    if remaining <= 0 then -- if remaining is ever < 0, it's technically an invalid KTX file, but handling just in case...
-      return Nothing
-    else do
-      keyAndValueByteSize <- fromIntegral <$> parseAnyWord32FromEndianness re
-      key <- takeThrough (== 0)
-      value <- take (keyAndValueByteSize - BS.length key)
-      let paddingSize = padding keyAndValueByteSize 4
-      void $ take paddingSize
-      return . Just $ ((key, value), remaining - 4 - keyAndValueByteSize - paddingSize) -- The 4 is from the keyAndValueByteSize word32 itself.
-
-getTextureDataSize :: MonadBinaryRead m => KtxReadWithHeaderT m p p Integer
-getTextureDataSize =
-  getHeader >>>= \h ->
-  liftToKtxReadT $ do
-    totalDataSize <- dataSize
-    let
-      metadataSize = fromIntegral $ header'bytesOfKeyValueData h
-      numMipLevels = fromIntegral $ header'numberOfMipmapLevels h
-    return $ totalDataSize - identifierSize - headerSize - metadataSize - numMipLevels * imageSizeFieldSize
-
+getTextureDataSize :: MonadFileReader m => KtxBodyReaderT m Integer
+getTextureDataSize = buildKtxBodyReaderT $ \h ->
+  let
+    metadataSize = fromIntegral . header'bytesOfKeyValueData $ h
+    numMipLevels = fromIntegral . header'numberOfMipmapLevels $ h
+  in
+  getFileSize <&> subtract (identifierSize + headerSize + metadataSize + numMipLevels * imageSizeFieldSize)
   where
     word32Size = 4
     identifierSize = 12
@@ -180,38 +110,44 @@ data BufferRegions =
   SimpleBufferRegions [SimpleBufferRegion] |
   NonArrayCubeMapBufferRegions [NonArrayCubeMapBufferRegion]
 
-readTextureDataToBuffer :: (MonadIO m, MonadBinaryRead m) => Ptr Word8 -> Size -> KtxReadWithHeaderT m 'Position'TextureData 'Position'End BufferRegions
-readTextureDataToBuffer bufferPtr bufferSize =
-  getHeader >>>= \h ->
+readTextureDataIntoBuffer :: MonadFileReader m => BufferWriterT (KtxBodyReaderT m) BufferRegions
+readTextureDataIntoBuffer = do
+  h <- lift ask
   let
     numMipmapLevels = fromIntegral $ effectiveNumberOfMipmapLevels h
     re = header'relativeEndianness h
-    readWord32' = readWord32FromEndianness re
-    readWordsToBuffer' = readWordsToBuffer re (fromIntegral $ header'glTypeSize h)
-  in
-  liftToKtxReadT . evalBufferWriterTOn bufferPtr bufferSize $
+    textureWordSize = fromIntegral $ header'glTypeSize h
+
+    readImageSize :: MonadFileReader m => BufferWriterT (KtxBodyReaderT m) Size
+    readImageSize = fromIntegral <$> lift (readWord32FromFileWithEndianness re)
+
+    readImageDataIntoBuffer :: MonadFileReader m => Size -> BufferWriterT (KtxBodyReaderT m) Offset
+    readImageDataIntoBuffer = readWordsFromFileIntoBuffer re textureWordSize . (`div` textureWordSize) . alignTo 4
+
   if isNonArrayCubeMap h then
     fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
-      imageSize <- liftToBufferWriterT $ fromIntegral <$> readWord32'
-      [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readWordsToBuffer' (alignTo 4 imageSize)
+      imageSize <- readImageSize
+      [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readImageDataIntoBuffer imageSize
       return (imageSize, o1, o2, o3, o4, o5, o6)
   else
     fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
-      imageSize <- liftToBufferWriterT  $ fromIntegral <$> readWord32'
-      offset <- readWordsToBuffer' (alignTo 4 imageSize)
+      imageSize <- readImageSize
+      offset <- readImageDataIntoBuffer imageSize
       return (imageSize, offset)
 
-readWordsToBuffer ::
-  (MonadIO m, MonadBinaryRead m) =>
-  RelativeEndianness ->
-  Size -> -- bytes per word
-  Size -> -- bytes to read
-  BufferWriterT m Offset
-readWordsToBuffer = \case
-  SameEndian -> const $ fmap fst . readToBuffer
-  FlipEndian -> \wordSize readSize -> do
-    (offset, offsetPtr) <- readToBuffer readSize
-    liftIO $ byteSwapWordsInPlace wordSize (castPtr offsetPtr) (readSize `quot` wordSize)
+readBytesFromFileIntoBuffer :: MonadFileReader m => Int -> BufferWriterT m (Ptr Word8, Offset)
+readBytesFromFileIntoBuffer numBytesToRead =
+  writeToBufferWith $ \offsetPtr bufferCapacity -> do
+    when (numBytesToRead > bufferCapacity) $ throwBufferWriteException "Buffer not large enough for this operation."
+    readBytesFromFileInto offsetPtr numBytesToRead
+    return (offsetPtr, numBytesToRead)
+
+readWordsFromFileIntoBuffer :: MonadFileReader m => RelativeEndianness -> Size -> Int -> BufferWriterT m Offset
+readWordsFromFileIntoBuffer = \case
+  SameEndian -> const $ fmap snd . readBytesFromFileIntoBuffer
+  FlipEndian -> \wordSize numWordsToRead -> do
+    (offsetPtr, offset) <- readBytesFromFileIntoBuffer (numWordsToRead * wordSize)
+    liftIO $ byteSwapWordsInPlace wordSize (castPtr offsetPtr) numWordsToRead
     return offset
 
 byteSwapWordsInPlace :: Size -> Ptr Word8 -> Int -> IO ()
@@ -242,8 +178,8 @@ takeThrough p =
     False -> Just . p
     True -> const Nothing
 
-readWord32FromEndianness :: MonadBinaryRead m => RelativeEndianness -> m Word32
-readWord32FromEndianness re = makeSameEndian re <$> readWord32
+readWord32FromFileWithEndianness :: MonadFileReader m => RelativeEndianness -> m Word32
+readWord32FromFileWithEndianness re = makeSameEndian re <$> readWord32FromFile
 
 makeSameEndian :: RelativeEndianness -> Word32 -> Word32
 makeSameEndian SameEndian = id
@@ -255,5 +191,15 @@ parseAnyWord32 = unsafeFromByteString <$> take 4
 parseAnyWord32FromEndianness :: RelativeEndianness -> Parser Word32
 parseAnyWord32FromEndianness re = makeSameEndian re <$> parseAnyWord32
 
-(>>>) :: IxMonad m => m i j a -> m j k b -> m i k b
-a >>> b = a >>>= const b
+parseMetadata :: RelativeEndianness -> Int -> Parser [(ByteString, ByteString)]
+parseMetadata re =
+  unfoldrM $ \remaining ->
+    if remaining <= 0 then -- if remaining is ever < 0, it's technically an invalid KTX file, but handling just in case...
+      return Nothing
+    else do
+      keyAndValueByteSize <- fromIntegral <$> parseAnyWord32FromEndianness re
+      key <- takeThrough (== 0)
+      value <- take (keyAndValueByteSize - BS.length key)
+      let paddingSize = padding keyAndValueByteSize 4
+      void $ take paddingSize
+      return . Just $ ((key, value), remaining - 4 - keyAndValueByteSize - paddingSize) -- The 4 is from the keyAndValueByteSize word32 itself.
