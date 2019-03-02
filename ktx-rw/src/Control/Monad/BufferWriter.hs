@@ -13,11 +13,10 @@ import Foreign.Ptr
 
 type Offset = Int
 type Size = Int
-  
-type BufferWriterEnv = (Ptr Word8, Size)
+type Buffer = (Ptr Word8, Size)
 
-newtype BufferWriterT m a = BufferWriterT { unBufferWriterT :: ReaderT BufferWriterEnv (StateT Offset m) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader BufferWriterEnv, MonadState Offset)
+newtype BufferWriterT m a = BufferWriterT { unBufferWriterT :: ReaderT Buffer (StateT Offset m) a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Buffer, MonadState Offset)
 
 instance MonadTrans BufferWriterT where
   lift = BufferWriterT . lift . lift
@@ -30,20 +29,20 @@ instance Exception BufferWriteException where
 throwBufferWriteException :: MonadThrow m => String -> m a
 throwBufferWriteException = throwM . BufferWriteException
 
-buildBufferWriterT :: Monad m => (BufferWriterEnv -> Offset -> m (a, Offset)) -> BufferWriterT m a
+buildBufferWriterT :: Monad m => (Buffer -> Offset -> m (a, Offset)) -> BufferWriterT m a
 buildBufferWriterT f = BufferWriterT . ReaderT $ StateT . f
 
-runBufferWriterT :: Monad m => BufferWriterT m a -> BufferWriterEnv -> Offset -> m (a, Offset)
+runBufferWriterT :: Monad m => BufferWriterT m a -> Buffer -> Offset -> m (a, Offset)
 runBufferWriterT bw = runStateT . (runReaderT . unBufferWriterT) bw
 
-runBufferWriterTOn :: Monad m => BufferWriterEnv -> Offset -> BufferWriterT m a -> m (a, Offset)
-runBufferWriterTOn env initialOffset bw = runBufferWriterT bw env initialOffset
+runBufferWriterTOn :: Monad m => Buffer -> Offset -> BufferWriterT m a -> m (a, Offset)
+runBufferWriterTOn buffer initialOffset bw = runBufferWriterT bw buffer initialOffset
 
-evalBufferWriterT :: Monad m => BufferWriterT m a -> BufferWriterEnv -> Offset -> m a
-evalBufferWriterT bw env initialOffset = fst <$> runBufferWriterT bw env initialOffset
+evalBufferWriterT :: Monad m => BufferWriterT m a -> Buffer -> Offset -> m a
+evalBufferWriterT bw buffer initialOffset = fst <$> runBufferWriterT bw buffer initialOffset
 
-evalBufferWriterTOn :: Monad m => BufferWriterEnv -> Offset -> BufferWriterT m a -> m a
-evalBufferWriterTOn env initialOffset bw = fst <$> runBufferWriterTOn env initialOffset bw
+evalBufferWriterTOn :: Monad m => Buffer -> Offset -> BufferWriterT m a -> m a
+evalBufferWriterTOn buffer initialOffset bw = fst <$> runBufferWriterTOn buffer initialOffset bw
 
 writeToBufferWith :: Monad m => (Ptr Word8 -> Size -> m (a, Size)) -> BufferWriterT m (a, Offset)
 writeToBufferWith write =

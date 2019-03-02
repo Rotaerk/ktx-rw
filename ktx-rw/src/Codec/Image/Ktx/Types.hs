@@ -2,6 +2,7 @@ module Codec.Image.Ktx.Types where
 
 import Data.Word
 import qualified Data.Set as Set
+import Data.ByteString (ByteString)
 
 data Header =
   Header {
@@ -58,3 +59,5 @@ replace match replacement value | value == match = replacement
 replace _ _ value = value
 
 data RelativeEndianness = SameEndian | FlipEndian deriving (Show, Eq)
+
+type Metadata = [(ByteString, ByteString)]

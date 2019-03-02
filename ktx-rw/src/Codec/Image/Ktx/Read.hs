@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Codec.Image.Ktx.Read where
@@ -24,6 +25,18 @@ import Foreign.Storable
 import System.IO
 
 import Prelude hiding (take)
+
+readKtxFile :: FilePath -> (Size -> IO Buffer) -> IO (Header, Metadata, Buffer, BufferRegions)
+readKtxFile filePath allocateBuffer =
+  withBinaryFile filePath ReadMode . runFileReaderT $
+  readAndCheckIdentifier >> readHeader >>= runKtxBodyReaderT (do
+    metadata <- readMetadata
+    textureDataSize <- getTextureDataSize
+    buffer@(_, bufferSize) <- liftIO $ allocateBuffer textureDataSize
+    when (textureDataSize < bufferSize) $ throwKtxFileReadException "Allocated buffer not large enough for texture data."
+    bufferRegions <- evalBufferWriterT readTextureDataIntoBuffer buffer 0
+    ask <&> (, metadata, buffer, bufferRegions)
+  )
 
 newtype KtxBodyReaderT m a = KtxBodyReaderT { unKtxBodyReaderT :: ReaderT Header m a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadReader Header)
@@ -78,7 +91,7 @@ readHeader = do
 skipMetadata :: MonadFileReader m => KtxBodyReaderT m ()
 skipMetadata = buildKtxBodyReaderT $ seekInFile RelativeSeek . fromIntegral . header'bytesOfKeyValueData
 
-readMetadata :: MonadFileReader m => KtxBodyReaderT m [(ByteString, ByteString)]
+readMetadata :: MonadFileReader m => KtxBodyReaderT m Metadata
 readMetadata = buildKtxBodyReaderT $ \h ->
   let
     size = fromIntegral . header'bytesOfKeyValueData $ h
@@ -90,13 +103,13 @@ readMetadata = buildKtxBodyReaderT $ \h ->
     Fail rest contexts message -> throwKtxFileReadException $ "Malformed metadata."
     Partial _ -> throwKtxFileReadException $ "Metadata parser expecting more input.  This shouldn't happen.  Implementation broken."
 
-getTextureDataSize :: MonadFileReader m => KtxBodyReaderT m Integer
+getTextureDataSize :: MonadFileReader m => KtxBodyReaderT m Size
 getTextureDataSize = buildKtxBodyReaderT $ \h ->
   let
     metadataSize = fromIntegral . header'bytesOfKeyValueData $ h
     numMipLevels = fromIntegral . header'numberOfMipmapLevels $ h
   in
-  getFileSize <&> subtract (identifierSize + headerSize + metadataSize + numMipLevels * imageSizeFieldSize)
+  getFileSize <&> subtract (identifierSize + headerSize + metadataSize + numMipLevels * imageSizeFieldSize) . fromIntegral
   where
     word32Size = 4
     identifierSize = 12
