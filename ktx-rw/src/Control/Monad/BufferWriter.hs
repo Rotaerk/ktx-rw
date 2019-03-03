@@ -27,7 +27,7 @@ type Size = Int
 type Buffer = (Ptr Word8, Size)
 
 newtype BufferWriterT m a = BufferWriterT { unBufferWriterT :: ReaderT Buffer (StateT Offset m) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Buffer, MonadState Offset)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Buffer, MonadState Offset)
 
 instance MonadTrans BufferWriterT where
   lift = BufferWriterT . lift . lift

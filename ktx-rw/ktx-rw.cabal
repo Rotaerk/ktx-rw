@@ -40,9 +40,12 @@ test-suite ktx-rw-test
     Properties
   build-depends:
     ktx-rw,
+    bytestring,
     Cabal,
     directory,
+    exceptions,
     filepath,
+    mtl,
     QuickCheck,
     base >= 4.11 && <4.12
   hs-source-dirs: test

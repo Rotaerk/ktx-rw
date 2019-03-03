@@ -25,8 +25,9 @@ import System.IO
 class (MonadIO m, MonadThrow m) => MonadFileReader m where
   getFileSize :: m Integer
   isEndOfFile :: m Bool
-  getPosnInFile :: m HandlePosn
-  setPosnInFile :: HandlePosn -> m ()
+  getByteOffsetInFile :: m Integer
+  getHandlePosnInFile :: m HandlePosn
+  setHandlePosnInFile :: HandlePosn -> m ()
   seekInFile :: SeekMode -> Integer -> m ()
   tryReadBytesFromFileInto :: Ptr a -> Int -> m Int
   tryReadBytesFromFile :: Int -> m ByteString
@@ -57,7 +58,7 @@ checkNumBytesObtained numBytesToRead numBytesObtained =
   when (numBytesObtained < numBytesToRead) $ throwFileReadException "Unexpected EOF."
 
 newtype FileReaderT m a = FileReaderT { unFileReaderT :: ReaderT Handle m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadReader Handle, MonadTrans)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Handle, MonadTrans)
 
 buildFileReaderT :: (Handle -> m a) -> FileReaderT m a
 buildFileReaderT = FileReaderT . ReaderT
@@ -68,8 +69,9 @@ runFileReaderT = runReaderT . unFileReaderT
 instance (MonadIO m, MonadThrow m) => MonadFileReader (FileReaderT m) where
   getFileSize = buildFileReaderT $ liftIO . hFileSize
   isEndOfFile = buildFileReaderT $ liftIO . hIsEOF
-  getPosnInFile = buildFileReaderT $ liftIO . hGetPosn
-  setPosnInFile = liftIO . hSetPosn
+  getByteOffsetInFile = buildFileReaderT $ liftIO . hTell
+  getHandlePosnInFile = buildFileReaderT $ liftIO . hGetPosn
+  setHandlePosnInFile = liftIO . hSetPosn
   seekInFile seekMode i = buildFileReaderT $ \h -> liftIO $ hSeek h seekMode i
   tryReadBytesFromFileInto buffer count = buildFileReaderT $ \h -> liftIO $ hGetBuf h buffer count
   tryReadBytesFromFile count = buildFileReaderT $ \h -> liftIO $ BS.hGet h count

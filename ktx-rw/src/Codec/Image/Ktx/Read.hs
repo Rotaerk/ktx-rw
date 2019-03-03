@@ -22,7 +22,7 @@ module Codec.Image.Ktx.Read (
 ) where
 
 import Codec.Image.Ktx.Types
-import Control.Exception
+import Control.Exception hiding (bracketOnError)
 import Control.Monad
 import Control.Monad.BufferWriter
 import Control.Monad.Catch
@@ -42,20 +42,19 @@ import System.IO
 
 import Prelude hiding (take)
 
-readKtxFile :: FilePath -> (Size -> IO Buffer) -> IO (Header, Metadata, Buffer, BufferRegions)
-readKtxFile filePath allocateBuffer =
+readKtxFile :: FilePath -> (Size -> IO (Ptr Word8)) -> (Ptr Word8 -> IO ()) -> IO (Header, Metadata, Buffer, BufferRegions)
+readKtxFile filePath allocateBuffer freeBuffer =
   withBinaryFile filePath ReadMode . runFileReaderT $
   readAndCheckIdentifier >> readHeader >>= runKtxBodyReaderT (do
     metadata <- readMetadata
     textureDataSize <- getTextureDataSize
-    buffer@(_, bufferSize) <- liftIO $ allocateBuffer textureDataSize
-    when (textureDataSize < bufferSize) $ throwKtxFileReadException "Allocated buffer not large enough for texture data."
-    bufferRegions <- evalBufferWriterT readTextureDataIntoBuffer buffer 0
-    ask <&> (, metadata, buffer, bufferRegions)
+    bracketOnError (liftIO $ allocateBuffer textureDataSize) (liftIO . freeBuffer) $ \((,textureDataSize) -> buffer) -> do
+      bufferRegions <- evalBufferWriterT readTextureDataIntoBuffer buffer 0
+      ask <&> (, metadata, buffer, bufferRegions)
   )
 
 newtype KtxBodyReaderT m a = KtxBodyReaderT { unKtxBodyReaderT :: ReaderT Header m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadReader Header)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Header)
 
 buildKtxBodyReaderT :: (Header -> m a) -> KtxBodyReaderT m a
 buildKtxBodyReaderT = KtxBodyReaderT . ReaderT
@@ -69,8 +68,9 @@ instance MonadTrans KtxBodyReaderT where
 instance MonadFileReader m => MonadFileReader (KtxBodyReaderT m) where
   getFileSize = lift getFileSize
   isEndOfFile = lift isEndOfFile
-  getPosnInFile = lift getPosnInFile
-  setPosnInFile = lift . setPosnInFile
+  getByteOffsetInFile = lift getByteOffsetInFile
+  getHandlePosnInFile = lift getHandlePosnInFile
+  setHandlePosnInFile = lift . setHandlePosnInFile
   seekInFile seekMode i = lift $ seekInFile seekMode i
   tryReadBytesFromFileInto buffer n = lift $ tryReadBytesFromFileInto buffer n
   tryReadBytesFromFile = lift . tryReadBytesFromFile
@@ -164,13 +164,13 @@ readTextureDataIntoBuffer = do
 readBytesFromFileIntoBuffer :: MonadFileReader m => Int -> BufferWriterT m (Ptr Word8, Offset)
 readBytesFromFileIntoBuffer numBytesToRead =
   writeToBufferWith $ \offsetPtr bufferCapacity -> do
-    when (numBytesToRead > bufferCapacity) $ throwBufferWriteException "Buffer not large enough for this operation."
+    when (numBytesToRead > bufferCapacity) $ throwBufferWriteException $ "Buffer not large enough for this operation.  Capacity: " ++ show bufferCapacity ++ ", Read Size: " ++ show numBytesToRead
     readBytesFromFileInto offsetPtr numBytesToRead
     return (offsetPtr, numBytesToRead)
 
 readWordsFromFileIntoBuffer :: MonadFileReader m => RelativeEndianness -> Size -> Int -> BufferWriterT m Offset
 readWordsFromFileIntoBuffer = \case
-  SameEndian -> const $ fmap snd . readBytesFromFileIntoBuffer
+  SameEndian -> \wordSize numWordsToRead -> snd <$> readBytesFromFileIntoBuffer (numWordsToRead * wordSize)
   FlipEndian -> \wordSize numWordsToRead -> do
     (offsetPtr, offset) <- readBytesFromFileIntoBuffer (numWordsToRead * wordSize)
     liftIO $ byteSwapWordsInPlace wordSize (castPtr offsetPtr) numWordsToRead
