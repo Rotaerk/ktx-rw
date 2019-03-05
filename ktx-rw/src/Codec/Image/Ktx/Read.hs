@@ -26,6 +26,7 @@ import Control.Exception hiding (bracketOnError)
 import Control.Monad
 import Control.Monad.BufferWriter
 import Control.Monad.Catch
+import Control.Monad.Fail
 import Control.Monad.FileReader
 import Control.Monad.IO.Class
 import Control.Monad.Loops
@@ -54,7 +55,7 @@ readKtxFile filePath allocateBuffer freeBuffer =
   )
 
 newtype KtxBodyReaderT m a = KtxBodyReaderT { unKtxBodyReaderT :: ReaderT Header m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Header)
+  deriving (Functor, Applicative, Monad, MonadFail, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Header)
 
 buildKtxBodyReaderT :: (Header -> m a) -> KtxBodyReaderT m a
 buildKtxBodyReaderT = KtxBodyReaderT . ReaderT
@@ -153,13 +154,12 @@ readTextureDataIntoBuffer = do
   if isNonArrayCubeMap h then
     fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
       imageSize <- readImageSize
-      [o1, o2, o3, o4, o5, o6] <- replicateM 6 $ readImageDataIntoBuffer imageSize
-      return (imageSize, o1, o2, o3, o4, o5, o6)
+      let r = readImageDataIntoBuffer imageSize
+      (imageSize,,,,,,) <$> r <*> r <*> r <*> r <*> r <*> r
   else
     fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
       imageSize <- readImageSize
-      offset <- readImageDataIntoBuffer imageSize
-      return (imageSize, offset)
+      (imageSize,) <$> readImageDataIntoBuffer imageSize
 
 readBytesFromFileIntoBuffer :: MonadFileReader m => Int -> BufferWriterT m (Ptr Word8, Offset)
 readBytesFromFileIntoBuffer numBytesToRead =

@@ -16,6 +16,7 @@ module Control.Monad.BufferWriter (
 
 import Control.Exception
 import Control.Monad.Catch
+import Control.Monad.Fail
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.State
@@ -27,7 +28,7 @@ type Size = Int
 type Buffer = (Ptr Word8, Size)
 
 newtype BufferWriterT m a = BufferWriterT { unBufferWriterT :: ReaderT Buffer (StateT Offset m) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Buffer, MonadState Offset)
+  deriving (Functor, Applicative, Monad, MonadFail, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Buffer, MonadState Offset)
 
 instance MonadTrans BufferWriterT where
   lift = BufferWriterT . lift . lift

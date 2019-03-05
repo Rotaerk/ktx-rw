@@ -14,6 +14,7 @@ module Control.Monad.FileReader (
 
 import Control.Exception
 import Control.Monad.Catch
+import Control.Monad.Fail
 import Control.Monad.Reader
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -58,7 +59,7 @@ checkNumBytesObtained numBytesToRead numBytesObtained =
   when (numBytesObtained < numBytesToRead) $ throwFileReadException "Unexpected EOF."
 
 newtype FileReaderT m a = FileReaderT { unFileReaderT :: ReaderT Handle m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Handle, MonadTrans)
+  deriving (Functor, Applicative, Monad, MonadFail, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Handle, MonadTrans)
 
 buildFileReaderT :: (Handle -> m a) -> FileReaderT m a
 buildFileReaderT = FileReaderT . ReaderT
