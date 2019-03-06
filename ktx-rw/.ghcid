@@ -1,1 +1,1 @@
--c "cabal new-repl" -T ":!cabal new-test" --reload=test --restart=ktx-rw.cabal
+.ghcid-notests
