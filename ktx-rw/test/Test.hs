@@ -17,7 +17,6 @@ import System.FilePath.Posix
 import System.IO
 
 import Codec.Image.Ktx.Read
-import Codec.Image.Ktx.Types
 import Control.Monad.FileReader
 import Control.Monad.BufferWriter
 

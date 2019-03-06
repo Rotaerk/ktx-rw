@@ -4,6 +4,7 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module Codec.Image.Ktx.Read (
+  module Codec.Image.Ktx.Types,
   readKtxFile,
   KtxBodyReaderT(),
   buildKtxBodyReaderT,
