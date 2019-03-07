@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -12,7 +13,7 @@ import Control.Exception
 import Data.Bits
 import Data.Word
 
-type GlEnum = Word32
+type GlEnum n = (Num n, Eq n, Show n)
 
 newtype GlConstantException = GlConstantException String deriving (Eq, Show, Read)
 
@@ -30,35 +31,64 @@ Format to glTexImage2D and glTexImage3D.
 ================================================================================================================================
 -}
 
-pattern GL_RED = 0x1903 :: GlEnum -- same as GL_RED_EXT
-pattern GL_GREEN = 0x1904 :: GlEnum -- deprecated
-pattern GL_BLUE = 0x1905 :: GlEnum -- deprecated
-pattern GL_ALPHA = 0x1906 :: GlEnum -- deprecated
-pattern GL_LUMINANCE = 0x1909 :: GlEnum -- deprecated
-pattern GL_SLUMINANCE = 0x8C46 :: GlEnum -- deprecated, same as GL_SLUMINANCE_EXT
-pattern GL_LUMINANCE_ALPHA = 0x190A :: GlEnum -- deprecated
-pattern GL_SLUMINANCE_ALPHA = 0x8C44 :: GlEnum -- deprecated, same as GL_SLUMINANCE_ALPHA_EXT
-pattern GL_INTENSITY = 0x8049 :: GlEnum -- deprecated, same as GL_INTENSITY_EXT
-pattern GL_RG = 0x8227 :: GlEnum -- same as GL_RG_EXT
-pattern GL_RGB = 0x1907 :: GlEnum
-pattern GL_BGR = 0x80E0 :: GlEnum -- same as GL_BGR_EXT
-pattern GL_RGBA = 0x1908 :: GlEnum
-pattern GL_BGRA = 0x80E1 :: GlEnum -- same as GL_BGRA_EXT
-pattern GL_RED_INTEGER = 0x8D94 :: GlEnum -- same as GL_RED_INTEGER_EXT
-pattern GL_GREEN_INTEGER = 0x8D95 :: GlEnum -- deprecated, same as GL_GREEN_INTEGER_EXT
-pattern GL_BLUE_INTEGER = 0x8D96 :: GlEnum -- deprecated, same as GL_BLUE_INTEGER_EXT
-pattern GL_ALPHA_INTEGER = 0x8D97 :: GlEnum -- deprecated, same as GL_ALPHA_INTEGER_EXT
-pattern GL_LUMINANCE_INTEGER = 0x8D9C :: GlEnum -- deprecated, same as GL_LUMINANCE_INTEGER_EXT
-pattern GL_LUMINANCE_ALPHA_INTEGER = 0x8D9D :: GlEnum -- deprecated, same as GL_LUMINANCE_ALPHA_INTEGER_EXT
-pattern GL_RG_INTEGER = 0x8228 :: GlEnum -- same as GL_RG_INTEGER_EXT
-pattern GL_RGB_INTEGER = 0x8D98 :: GlEnum -- same as GL_RGB_INTEGER_EXT
-pattern GL_BGR_INTEGER = 0x8D9A :: GlEnum -- same as GL_BGR_INTEGER_EXT
-pattern GL_RGBA_INTEGER = 0x8D99 :: GlEnum -- same as GL_RGBA_INTEGER_EXT
-pattern GL_BGRA_INTEGER = 0x8D9B :: GlEnum -- same as GL_BGRA_INTEGER_EXT
-pattern GL_COLOR_INDEX = 0x1900 :: GlEnum -- deprecated
-pattern GL_STENCIL_INDEX = 0x1901 :: GlEnum
-pattern GL_DEPTH_COMPONENT = 0x1902 :: GlEnum
-pattern GL_DEPTH_STENCIL = 0x84F9 :: GlEnum -- same as GL_DEPTH_STENCIL_NV and GL_DEPTH_STENCIL_EXT and GL_DEPTH_STENCIL_OES
+pattern GL_RED :: GlEnum n => n
+pattern GL_RED = 0x1903 -- same as GL_RED_EXT
+pattern GL_GREEN :: GlEnum n => n
+pattern GL_GREEN = 0x1904 -- deprecated
+pattern GL_BLUE :: GlEnum n => n
+pattern GL_BLUE = 0x1905 -- deprecated
+pattern GL_ALPHA :: GlEnum n => n
+pattern GL_ALPHA = 0x1906 -- deprecated
+pattern GL_LUMINANCE :: GlEnum n => n
+pattern GL_LUMINANCE = 0x1909 -- deprecated
+pattern GL_SLUMINANCE :: GlEnum n => n
+pattern GL_SLUMINANCE = 0x8C46 -- deprecated, same as GL_SLUMINANCE_EXT
+pattern GL_LUMINANCE_ALPHA :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA = 0x190A -- deprecated
+pattern GL_SLUMINANCE_ALPHA :: GlEnum n => n
+pattern GL_SLUMINANCE_ALPHA = 0x8C44 -- deprecated, same as GL_SLUMINANCE_ALPHA_EXT
+pattern GL_INTENSITY :: GlEnum n => n
+pattern GL_INTENSITY = 0x8049 -- deprecated, same as GL_INTENSITY_EXT
+pattern GL_RG :: GlEnum n => n
+pattern GL_RG = 0x8227 -- same as GL_RG_EXT
+pattern GL_RGB :: GlEnum n => n
+pattern GL_RGB = 0x1907
+pattern GL_BGR :: GlEnum n => n
+pattern GL_BGR = 0x80E0 -- same as GL_BGR_EXT
+pattern GL_RGBA :: GlEnum n => n
+pattern GL_RGBA = 0x1908
+pattern GL_BGRA :: GlEnum n => n
+pattern GL_BGRA = 0x80E1 -- same as GL_BGRA_EXT
+pattern GL_RED_INTEGER :: GlEnum n => n
+pattern GL_RED_INTEGER = 0x8D94 -- same as GL_RED_INTEGER_EXT
+pattern GL_GREEN_INTEGER :: GlEnum n => n
+pattern GL_GREEN_INTEGER = 0x8D95 -- deprecated, same as GL_GREEN_INTEGER_EXT
+pattern GL_BLUE_INTEGER :: GlEnum n => n
+pattern GL_BLUE_INTEGER = 0x8D96 -- deprecated, same as GL_BLUE_INTEGER_EXT
+pattern GL_ALPHA_INTEGER :: GlEnum n => n
+pattern GL_ALPHA_INTEGER = 0x8D97 -- deprecated, same as GL_ALPHA_INTEGER_EXT
+pattern GL_LUMINANCE_INTEGER :: GlEnum n => n
+pattern GL_LUMINANCE_INTEGER = 0x8D9C -- deprecated, same as GL_LUMINANCE_INTEGER_EXT
+pattern GL_LUMINANCE_ALPHA_INTEGER :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA_INTEGER = 0x8D9D -- deprecated, same as GL_LUMINANCE_ALPHA_INTEGER_EXT
+pattern GL_RG_INTEGER :: GlEnum n => n
+pattern GL_RG_INTEGER = 0x8228 -- same as GL_RG_INTEGER_EXT
+pattern GL_RGB_INTEGER :: GlEnum n => n
+pattern GL_RGB_INTEGER = 0x8D98 -- same as GL_RGB_INTEGER_EXT
+pattern GL_BGR_INTEGER :: GlEnum n => n
+pattern GL_BGR_INTEGER = 0x8D9A -- same as GL_BGR_INTEGER_EXT
+pattern GL_RGBA_INTEGER :: GlEnum n => n
+pattern GL_RGBA_INTEGER = 0x8D99 -- same as GL_RGBA_INTEGER_EXT
+pattern GL_BGRA_INTEGER :: GlEnum n => n
+pattern GL_BGRA_INTEGER = 0x8D9B -- same as GL_BGRA_INTEGER_EXT
+pattern GL_COLOR_INDEX :: GlEnum n => n
+pattern GL_COLOR_INDEX = 0x1900 -- deprecated
+pattern GL_STENCIL_INDEX :: GlEnum n => n
+pattern GL_STENCIL_INDEX = 0x1901
+pattern GL_DEPTH_COMPONENT :: GlEnum n => n
+pattern GL_DEPTH_COMPONENT = 0x1902
+pattern GL_DEPTH_STENCIL :: GlEnum n => n
+pattern GL_DEPTH_STENCIL = 0x84F9 -- same as GL_DEPTH_STENCIL_NV and GL_DEPTH_STENCIL_EXT and GL_DEPTH_STENCIL_OES
 
 {-
 ================================================================================================================================
@@ -68,34 +98,62 @@ Type to glTexImage2D, glTexImage3D and glVertexAttribPointer.
 ================================================================================================================================
 -}
 
-pattern GL_BYTE = 0x1400 :: GlEnum
-pattern GL_UNSIGNED_BYTE = 0x1401 :: GlEnum
-pattern GL_SHORT = 0x1402 :: GlEnum
-pattern GL_UNSIGNED_SHORT = 0x1403 :: GlEnum
-pattern GL_INT = 0x1404 :: GlEnum
-pattern GL_UNSIGNED_INT = 0x1405 :: GlEnum
-pattern GL_INT64 = 0x140E :: GlEnum -- same as GL_INT64_NV and GL_INT64_ARB
-pattern GL_UNSIGNED_INT64 = 0x140F :: GlEnum -- same as GL_UNSIGNED_INT64_NV and GL_UNSIGNED_INT64_ARB
-pattern GL_HALF_FLOAT = 0x140B :: GlEnum -- same as GL_HALF_FLOAT_NV and GL_HALF_FLOAT_ARB
-pattern GL_HALF_FLOAT_OES = 0x8D61 :: GlEnum -- Note that this different from GL_HALF_FLOAT.
-pattern GL_FLOAT = 0x1406 :: GlEnum
-pattern GL_DOUBLE = 0x140A :: GlEnum -- same as GL_DOUBLE_EXT
-pattern GL_UNSIGNED_BYTE_3_3_2 = 0x8032 :: GlEnum -- same as GL_UNSIGNED_BYTE_3_3_2_EXT
-pattern GL_UNSIGNED_BYTE_2_3_3_REV = 0x8362 :: GlEnum -- same as GL_UNSIGNED_BYTE_2_3_3_REV_EXT
-pattern GL_UNSIGNED_SHORT_5_6_5 = 0x8363 :: GlEnum -- same as GL_UNSIGNED_SHORT_5_6_5_EXT
-pattern GL_UNSIGNED_SHORT_5_6_5_REV = 0x8364 :: GlEnum -- same as GL_UNSIGNED_SHORT_5_6_5_REV_EXT
-pattern GL_UNSIGNED_SHORT_4_4_4_4 = 0x8033 :: GlEnum -- same as GL_UNSIGNED_SHORT_4_4_4_4_EXT
-pattern GL_UNSIGNED_SHORT_4_4_4_4_REV = 0x8365 :: GlEnum -- same as GL_UNSIGNED_SHORT_4_4_4_4_REV_IMG and GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT
-pattern GL_UNSIGNED_SHORT_5_5_5_1 = 0x8034 :: GlEnum -- same as GL_UNSIGNED_SHORT_5_5_5_1_EXT
-pattern GL_UNSIGNED_SHORT_1_5_5_5_REV = 0x8366 :: GlEnum -- same as GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT
-pattern GL_UNSIGNED_INT_8_8_8_8 = 0x8035 :: GlEnum -- same as GL_UNSIGNED_INT_8_8_8_8_EXT
-pattern GL_UNSIGNED_INT_8_8_8_8_REV = 0x8367 :: GlEnum -- same as GL_UNSIGNED_INT_8_8_8_8_REV_EXT
-pattern GL_UNSIGNED_INT_10_10_10_2 = 0x8036 :: GlEnum -- same as GL_UNSIGNED_INT_10_10_10_2_EXT
-pattern GL_UNSIGNED_INT_2_10_10_10_REV = 0x8368 :: GlEnum -- same as GL_UNSIGNED_INT_2_10_10_10_REV_EXT
-pattern GL_UNSIGNED_INT_10F_11F_11F_REV = 0x8C3B :: GlEnum -- same as GL_UNSIGNED_INT_10F_11F_11F_REV_EXT
-pattern GL_UNSIGNED_INT_5_9_9_9_REV = 0x8C3E :: GlEnum -- same as GL_UNSIGNED_INT_5_9_9_9_REV_EXT
-pattern GL_UNSIGNED_INT_24_8 = 0x84FA :: GlEnum -- same as GL_UNSIGNED_INT_24_8_NV and GL_UNSIGNED_INT_24_8_EXT and GL_UNSIGNED_INT_24_8_OES
-pattern GL_FLOAT_32_UNSIGNED_INT_24_8_REV = 0x8DAD :: GlEnum -- same as GL_FLOAT_32_UNSIGNED_INT_24_8_REV_NV and GL_FLOAT_32_UNSIGNED_INT_24_8_REV_ARB
+pattern GL_BYTE :: GlEnum n => n
+pattern GL_BYTE = 0x1400
+pattern GL_UNSIGNED_BYTE :: GlEnum n => n
+pattern GL_UNSIGNED_BYTE = 0x1401
+pattern GL_SHORT :: GlEnum n => n
+pattern GL_SHORT = 0x1402
+pattern GL_UNSIGNED_SHORT :: GlEnum n => n
+pattern GL_UNSIGNED_SHORT = 0x1403
+pattern GL_INT :: GlEnum n => n
+pattern GL_INT = 0x1404
+pattern GL_UNSIGNED_INT :: GlEnum n => n
+pattern GL_UNSIGNED_INT = 0x1405
+pattern GL_INT64 :: GlEnum n => n
+pattern GL_INT64 = 0x140E -- same as GL_INT64_NV and GL_INT64_ARB
+pattern GL_UNSIGNED_INT64 :: GlEnum n => n
+pattern GL_UNSIGNED_INT64 = 0x140F -- same as GL_UNSIGNED_INT64_NV and GL_UNSIGNED_INT64_ARB
+pattern GL_HALF_FLOAT :: GlEnum n => n
+pattern GL_HALF_FLOAT = 0x140B -- same as GL_HALF_FLOAT_NV and GL_HALF_FLOAT_ARB
+pattern GL_HALF_FLOAT_OES :: GlEnum n => n
+pattern GL_HALF_FLOAT_OES = 0x8D61 -- Note that this different from GL_HALF_FLOAT.
+pattern GL_FLOAT :: GlEnum n => n
+pattern GL_FLOAT = 0x1406
+pattern GL_DOUBLE :: GlEnum n => n
+pattern GL_DOUBLE = 0x140A -- same as GL_DOUBLE_EXT
+pattern GL_UNSIGNED_BYTE_3_3_2 :: GlEnum n => n
+pattern GL_UNSIGNED_BYTE_3_3_2 = 0x8032 -- same as GL_UNSIGNED_BYTE_3_3_2_EXT
+pattern GL_UNSIGNED_BYTE_2_3_3_REV :: GlEnum n => n
+pattern GL_UNSIGNED_BYTE_2_3_3_REV = 0x8362 -- same as GL_UNSIGNED_BYTE_2_3_3_REV_EXT
+pattern GL_UNSIGNED_SHORT_5_6_5 :: GlEnum n => n
+pattern GL_UNSIGNED_SHORT_5_6_5 = 0x8363 -- same as GL_UNSIGNED_SHORT_5_6_5_EXT
+pattern GL_UNSIGNED_SHORT_5_6_5_REV :: GlEnum n => n
+pattern GL_UNSIGNED_SHORT_5_6_5_REV = 0x8364 -- same as GL_UNSIGNED_SHORT_5_6_5_REV_EXT
+pattern GL_UNSIGNED_SHORT_4_4_4_4 :: GlEnum n => n
+pattern GL_UNSIGNED_SHORT_4_4_4_4 = 0x8033 -- same as GL_UNSIGNED_SHORT_4_4_4_4_EXT
+pattern GL_UNSIGNED_SHORT_4_4_4_4_REV :: GlEnum n => n
+pattern GL_UNSIGNED_SHORT_4_4_4_4_REV = 0x8365 -- same as GL_UNSIGNED_SHORT_4_4_4_4_REV_IMG and GL_UNSIGNED_SHORT_4_4_4_4_REV_EXT
+pattern GL_UNSIGNED_SHORT_5_5_5_1 :: GlEnum n => n
+pattern GL_UNSIGNED_SHORT_5_5_5_1 = 0x8034 -- same as GL_UNSIGNED_SHORT_5_5_5_1_EXT
+pattern GL_UNSIGNED_SHORT_1_5_5_5_REV :: GlEnum n => n
+pattern GL_UNSIGNED_SHORT_1_5_5_5_REV = 0x8366 -- same as GL_UNSIGNED_SHORT_1_5_5_5_REV_EXT
+pattern GL_UNSIGNED_INT_8_8_8_8 :: GlEnum n => n
+pattern GL_UNSIGNED_INT_8_8_8_8 = 0x8035 -- same as GL_UNSIGNED_INT_8_8_8_8_EXT
+pattern GL_UNSIGNED_INT_8_8_8_8_REV :: GlEnum n => n
+pattern GL_UNSIGNED_INT_8_8_8_8_REV = 0x8367 -- same as GL_UNSIGNED_INT_8_8_8_8_REV_EXT
+pattern GL_UNSIGNED_INT_10_10_10_2 :: GlEnum n => n
+pattern GL_UNSIGNED_INT_10_10_10_2 = 0x8036 -- same as GL_UNSIGNED_INT_10_10_10_2_EXT
+pattern GL_UNSIGNED_INT_2_10_10_10_REV :: GlEnum n => n
+pattern GL_UNSIGNED_INT_2_10_10_10_REV = 0x8368 -- same as GL_UNSIGNED_INT_2_10_10_10_REV_EXT
+pattern GL_UNSIGNED_INT_10F_11F_11F_REV :: GlEnum n => n
+pattern GL_UNSIGNED_INT_10F_11F_11F_REV = 0x8C3B -- same as GL_UNSIGNED_INT_10F_11F_11F_REV_EXT
+pattern GL_UNSIGNED_INT_5_9_9_9_REV :: GlEnum n => n
+pattern GL_UNSIGNED_INT_5_9_9_9_REV = 0x8C3E -- same as GL_UNSIGNED_INT_5_9_9_9_REV_EXT
+pattern GL_UNSIGNED_INT_24_8 :: GlEnum n => n
+pattern GL_UNSIGNED_INT_24_8 = 0x84FA -- same as GL_UNSIGNED_INT_24_8_NV and GL_UNSIGNED_INT_24_8_EXT and GL_UNSIGNED_INT_24_8_OES
+pattern GL_FLOAT_32_UNSIGNED_INT_24_8_REV :: GlEnum n => n
+pattern GL_FLOAT_32_UNSIGNED_INT_24_8_REV = 0x8DAD -- same as GL_FLOAT_32_UNSIGNED_INT_24_8_REV_NV and GL_FLOAT_32_UNSIGNED_INT_24_8_REV_ARB
 
 {-
 ================================================================================================================================
@@ -109,375 +167,637 @@ Internal format to glTexImage2D, glTexImage3D, glCompressedTexImage2D, glCompres
 -- 8 bits per component
 --
 
-pattern GL_R8 = 0x8229 :: GlEnum -- same as GL_R8_EXT
-pattern GL_RG8 = 0x822B :: GlEnum -- same as GL_RG8_EXT
-pattern GL_RGB8 = 0x8051 :: GlEnum -- same as GL_RGB8_EXT and GL_RGB8_OES
-pattern GL_RGBA8 = 0x8058 :: GlEnum -- same as GL_RGBA8_EXT and GL_RGBA8_OES
+pattern GL_R8 :: GlEnum n => n
+pattern GL_R8 = 0x8229 -- same as GL_R8_EXT
+pattern GL_RG8 :: GlEnum n => n
+pattern GL_RG8 = 0x822B -- same as GL_RG8_EXT
+pattern GL_RGB8 :: GlEnum n => n
+pattern GL_RGB8 = 0x8051 -- same as GL_RGB8_EXT and GL_RGB8_OES
+pattern GL_RGBA8 :: GlEnum n => n
+pattern GL_RGBA8 = 0x8058 -- same as GL_RGBA8_EXT and GL_RGBA8_OES
 
-pattern GL_R8_SNORM = 0x8F94 :: GlEnum
-pattern GL_RG8_SNORM = 0x8F95 :: GlEnum
-pattern GL_RGB8_SNORM = 0x8F96 :: GlEnum
-pattern GL_RGBA8_SNORM = 0x8F97 :: GlEnum
+pattern GL_R8_SNORM :: GlEnum n => n
+pattern GL_R8_SNORM = 0x8F94
+pattern GL_RG8_SNORM :: GlEnum n => n
+pattern GL_RG8_SNORM = 0x8F95
+pattern GL_RGB8_SNORM :: GlEnum n => n
+pattern GL_RGB8_SNORM = 0x8F96
+pattern GL_RGBA8_SNORM :: GlEnum n => n
+pattern GL_RGBA8_SNORM = 0x8F97
 
-pattern GL_R8UI = 0x8232 :: GlEnum
-pattern GL_RG8UI = 0x8238 :: GlEnum
-pattern GL_RGB8UI = 0x8D7D :: GlEnum -- same as GL_RGB8UI_EXT
-pattern GL_RGBA8UI = 0x8D7C :: GlEnum -- same as GL_RGBA8UI_EXT
+pattern GL_R8UI :: GlEnum n => n
+pattern GL_R8UI = 0x8232
+pattern GL_RG8UI :: GlEnum n => n
+pattern GL_RG8UI = 0x8238
+pattern GL_RGB8UI :: GlEnum n => n
+pattern GL_RGB8UI = 0x8D7D -- same as GL_RGB8UI_EXT
+pattern GL_RGBA8UI :: GlEnum n => n
+pattern GL_RGBA8UI = 0x8D7C -- same as GL_RGBA8UI_EXT
 
-pattern GL_R8I = 0x8231 :: GlEnum
-pattern GL_RG8I = 0x8237 :: GlEnum
-pattern GL_RGB8I = 0x8D8F :: GlEnum -- same as GL_RGB8I_EXT
-pattern GL_RGBA8I = 0x8D8E :: GlEnum -- same as GL_RGBA8I_EXT
+pattern GL_R8I :: GlEnum n => n
+pattern GL_R8I = 0x8231
+pattern GL_RG8I :: GlEnum n => n
+pattern GL_RG8I = 0x8237
+pattern GL_RGB8I :: GlEnum n => n
+pattern GL_RGB8I = 0x8D8F -- same as GL_RGB8I_EXT
+pattern GL_RGBA8I :: GlEnum n => n
+pattern GL_RGBA8I = 0x8D8E -- same as GL_RGBA8I_EXT
 
-pattern GL_SR8 = 0x8FBD :: GlEnum -- same as GL_SR8_EXT
-pattern GL_SRG8 = 0x8FBE :: GlEnum -- same as GL_SRG8_EXT
-pattern GL_SRGB8 = 0x8C41 :: GlEnum -- same as GL_SRGB8_EXT
-pattern GL_SRGB8_ALPHA8 = 0x8C43 :: GlEnum -- same as GL_SRGB8_ALPHA8_EXT
+pattern GL_SR8 :: GlEnum n => n
+pattern GL_SR8 = 0x8FBD -- same as GL_SR8_EXT
+pattern GL_SRG8 :: GlEnum n => n
+pattern GL_SRG8 = 0x8FBE -- same as GL_SRG8_EXT
+pattern GL_SRGB8 :: GlEnum n => n
+pattern GL_SRGB8 = 0x8C41 -- same as GL_SRGB8_EXT
+pattern GL_SRGB8_ALPHA8 :: GlEnum n => n
+pattern GL_SRGB8_ALPHA8 = 0x8C43 -- same as GL_SRGB8_ALPHA8_EXT
 
 --
 -- 16 bits per component
 --
 
-pattern GL_R16 = 0x822A :: GlEnum -- same as GL_R16_EXT
-pattern GL_RG16 = 0x822C :: GlEnum -- same as GL_RG16_EXT
-pattern GL_RGB16 = 0x8054 :: GlEnum -- same as GL_RGB16_EXT
-pattern GL_RGBA16 = 0x805B :: GlEnum -- same as GL_RGBA16_EXT
+pattern GL_R16 :: GlEnum n => n
+pattern GL_R16 = 0x822A -- same as GL_R16_EXT
+pattern GL_RG16 :: GlEnum n => n
+pattern GL_RG16 = 0x822C -- same as GL_RG16_EXT
+pattern GL_RGB16 :: GlEnum n => n
+pattern GL_RGB16 = 0x8054 -- same as GL_RGB16_EXT
+pattern GL_RGBA16 :: GlEnum n => n
+pattern GL_RGBA16 = 0x805B -- same as GL_RGBA16_EXT
 
-pattern GL_R16_SNORM = 0x8F98 :: GlEnum -- same as GL_R16_SNORM_EXT
-pattern GL_RG16_SNORM = 0x8F99 :: GlEnum -- same as GL_RG16_SNORM_EXT
-pattern GL_RGB16_SNORM = 0x8F9A :: GlEnum -- same as GL_RGB16_SNORM_EXT
-pattern GL_RGBA16_SNORM = 0x8F9B :: GlEnum -- same as GL_RGBA16_SNORM_EXT
+pattern GL_R16_SNORM :: GlEnum n => n
+pattern GL_R16_SNORM = 0x8F98 -- same as GL_R16_SNORM_EXT
+pattern GL_RG16_SNORM :: GlEnum n => n
+pattern GL_RG16_SNORM = 0x8F99 -- same as GL_RG16_SNORM_EXT
+pattern GL_RGB16_SNORM :: GlEnum n => n
+pattern GL_RGB16_SNORM = 0x8F9A -- same as GL_RGB16_SNORM_EXT
+pattern GL_RGBA16_SNORM :: GlEnum n => n
+pattern GL_RGBA16_SNORM = 0x8F9B -- same as GL_RGBA16_SNORM_EXT
 
-pattern GL_R16UI = 0x8234 :: GlEnum
-pattern GL_RG16UI = 0x823A :: GlEnum
-pattern GL_RGB16UI = 0x8D77 :: GlEnum -- same as GL_RGB16UI_EXT
-pattern GL_RGBA16UI = 0x8D76 :: GlEnum -- same as GL_RGBA16UI_EXT
+pattern GL_R16UI :: GlEnum n => n
+pattern GL_R16UI = 0x8234
+pattern GL_RG16UI :: GlEnum n => n
+pattern GL_RG16UI = 0x823A
+pattern GL_RGB16UI :: GlEnum n => n
+pattern GL_RGB16UI = 0x8D77 -- same as GL_RGB16UI_EXT
+pattern GL_RGBA16UI :: GlEnum n => n
+pattern GL_RGBA16UI = 0x8D76 -- same as GL_RGBA16UI_EXT
 
-pattern GL_R16I = 0x8233 :: GlEnum
-pattern GL_RG16I = 0x8239 :: GlEnum
-pattern GL_RGB16I = 0x8D89 :: GlEnum -- same as GL_RGB16I_EXT
-pattern GL_RGBA16I = 0x8D88 :: GlEnum -- same as GL_RGBA16I_EXT
+pattern GL_R16I :: GlEnum n => n
+pattern GL_R16I = 0x8233
+pattern GL_RG16I :: GlEnum n => n
+pattern GL_RG16I = 0x8239
+pattern GL_RGB16I :: GlEnum n => n
+pattern GL_RGB16I = 0x8D89 -- same as GL_RGB16I_EXT
+pattern GL_RGBA16I :: GlEnum n => n
+pattern GL_RGBA16I = 0x8D88 -- same as GL_RGBA16I_EXT
 
-pattern GL_R16F = 0x822D :: GlEnum -- same as GL_R16F_EXT
-pattern GL_RG16F = 0x822F :: GlEnum -- same as GL_RG16F_EXT
-pattern GL_RGB16F = 0x881B :: GlEnum -- same as GL_RGB16F_EXT and GL_RGB16F_ARB
-pattern GL_RGBA16F = 0x881A :: GlEnum -- sama as GL_RGBA16F_EXT and GL_RGBA16F_ARB
+pattern GL_R16F :: GlEnum n => n
+pattern GL_R16F = 0x822D -- same as GL_R16F_EXT
+pattern GL_RG16F :: GlEnum n => n
+pattern GL_RG16F = 0x822F -- same as GL_RG16F_EXT
+pattern GL_RGB16F :: GlEnum n => n
+pattern GL_RGB16F = 0x881B -- same as GL_RGB16F_EXT and GL_RGB16F_ARB
+pattern GL_RGBA16F :: GlEnum n => n
+pattern GL_RGBA16F = 0x881A -- sama as GL_RGBA16F_EXT and GL_RGBA16F_ARB
 
 --
 -- 32 bits per component
 --
 
-pattern GL_R32UI = 0x8236 :: GlEnum
-pattern GL_RG32UI = 0x823C :: GlEnum
-pattern GL_RGB32UI = 0x8D71 :: GlEnum -- same as GL_RGB32UI_EXT
-pattern GL_RGBA32UI = 0x8D70 :: GlEnum -- same as GL_RGBA32UI_EXT
+pattern GL_R32UI :: GlEnum n => n
+pattern GL_R32UI = 0x8236
+pattern GL_RG32UI :: GlEnum n => n
+pattern GL_RG32UI = 0x823C
+pattern GL_RGB32UI :: GlEnum n => n
+pattern GL_RGB32UI = 0x8D71 -- same as GL_RGB32UI_EXT
+pattern GL_RGBA32UI :: GlEnum n => n
+pattern GL_RGBA32UI = 0x8D70 -- same as GL_RGBA32UI_EXT
 
-pattern GL_R32I = 0x8235 :: GlEnum
-pattern GL_RG32I = 0x823B :: GlEnum
-pattern GL_RGB32I = 0x8D83 :: GlEnum -- same as GL_RGB32I_EXT 
-pattern GL_RGBA32I = 0x8D82 :: GlEnum -- same as GL_RGBA32I_EXT
+pattern GL_R32I :: GlEnum n => n
+pattern GL_R32I = 0x8235
+pattern GL_RG32I :: GlEnum n => n
+pattern GL_RG32I = 0x823B
+pattern GL_RGB32I :: GlEnum n => n
+pattern GL_RGB32I = 0x8D83 -- same as GL_RGB32I_EXT 
+pattern GL_RGBA32I :: GlEnum n => n
+pattern GL_RGBA32I = 0x8D82 -- same as GL_RGBA32I_EXT
 
-pattern GL_R32F = 0x822E :: GlEnum -- same as GL_R32F_EXT
-pattern GL_RG32F = 0x8230 :: GlEnum -- same as GL_RG32F_EXT
-pattern GL_RGB32F = 0x8815 :: GlEnum -- same as GL_RGB32F_EXT and GL_RGB32F_ARB
-pattern GL_RGBA32F = 0x8814 :: GlEnum -- same as GL_RGBA32F_EXT and GL_RGBA32F_ARB
+pattern GL_R32F :: GlEnum n => n
+pattern GL_R32F = 0x822E -- same as GL_R32F_EXT
+pattern GL_RG32F :: GlEnum n => n
+pattern GL_RG32F = 0x8230 -- same as GL_RG32F_EXT
+pattern GL_RGB32F :: GlEnum n => n
+pattern GL_RGB32F = 0x8815 -- same as GL_RGB32F_EXT and GL_RGB32F_ARB
+pattern GL_RGBA32F :: GlEnum n => n
+pattern GL_RGBA32F = 0x8814 -- same as GL_RGBA32F_EXT and GL_RGBA32F_ARB
 
 --
 -- Packed
 --
 
-pattern GL_R3_G3_B2 = 0x2A10 :: GlEnum
-pattern GL_RGB4 = 0x804F :: GlEnum -- same as GL_RGB4_EXT
-pattern GL_RGB5 = 0x8050 :: GlEnum -- same as GL_RGB5_EXT
-pattern GL_RGB565 = 0x8D62 :: GlEnum -- same as GL_RGB565_EXT and GL_RGB565_OES
-pattern GL_RGB10 = 0x8052 :: GlEnum -- same as GL_RGB10_EXT
-pattern GL_RGB12 = 0x8053 :: GlEnum -- same as GL_RGB12_EXT
-pattern GL_RGBA2 = 0x8055 :: GlEnum -- same as GL_RGBA2_EXT
-pattern GL_RGBA4 = 0x8056 :: GlEnum -- same as GL_RGBA4_EXT and GL_RGBA4_OES
-pattern GL_RGBA12 = 0x805A :: GlEnum -- same as GL_RGBA12_EXT
-pattern GL_RGB5_A1 = 0x8057 :: GlEnum -- same as GL_RGB5_A1_EXT and GL_RGB5_A1_OES
-pattern GL_RGB10_A2 = 0x8059 :: GlEnum -- same as GL_RGB10_A2_EXT
-pattern GL_RGB10_A2UI = 0x906F :: GlEnum
-pattern GL_R11F_G11F_B10F = 0x8C3A :: GlEnum -- same as GL_R11F_G11F_B10F_APPLE and GL_R11F_G11F_B10F_EXT
-pattern GL_RGB9_E5 = 0x8C3D :: GlEnum -- same as GL_RGB9_E5_APPLE and GL_RGB9_E5_EXT
+pattern GL_R3_G3_B2 :: GlEnum n => n
+pattern GL_R3_G3_B2 = 0x2A10
+pattern GL_RGB4 :: GlEnum n => n
+pattern GL_RGB4 = 0x804F -- same as GL_RGB4_EXT
+pattern GL_RGB5 :: GlEnum n => n
+pattern GL_RGB5 = 0x8050 -- same as GL_RGB5_EXT
+pattern GL_RGB565 :: GlEnum n => n
+pattern GL_RGB565 = 0x8D62 -- same as GL_RGB565_EXT and GL_RGB565_OES
+pattern GL_RGB10 :: GlEnum n => n
+pattern GL_RGB10 = 0x8052 -- same as GL_RGB10_EXT
+pattern GL_RGB12 :: GlEnum n => n
+pattern GL_RGB12 = 0x8053 -- same as GL_RGB12_EXT
+pattern GL_RGBA2 :: GlEnum n => n
+pattern GL_RGBA2 = 0x8055 -- same as GL_RGBA2_EXT
+pattern GL_RGBA4 :: GlEnum n => n
+pattern GL_RGBA4 = 0x8056 -- same as GL_RGBA4_EXT and GL_RGBA4_OES
+pattern GL_RGBA12 :: GlEnum n => n
+pattern GL_RGBA12 = 0x805A -- same as GL_RGBA12_EXT
+pattern GL_RGB5_A1 :: GlEnum n => n
+pattern GL_RGB5_A1 = 0x8057 -- same as GL_RGB5_A1_EXT and GL_RGB5_A1_OES
+pattern GL_RGB10_A2 :: GlEnum n => n
+pattern GL_RGB10_A2 = 0x8059 -- same as GL_RGB10_A2_EXT
+pattern GL_RGB10_A2UI :: GlEnum n => n
+pattern GL_RGB10_A2UI = 0x906F
+pattern GL_R11F_G11F_B10F :: GlEnum n => n
+pattern GL_R11F_G11F_B10F = 0x8C3A -- same as GL_R11F_G11F_B10F_APPLE and GL_R11F_G11F_B10F_EXT
+pattern GL_RGB9_E5 :: GlEnum n => n
+pattern GL_RGB9_E5 = 0x8C3D -- same as GL_RGB9_E5_APPLE and GL_RGB9_E5_EXT
 
 --
 -- Alpha
 --
 
-pattern GL_ALPHA4 = 0x803B :: GlEnum -- deprecated, same as GL_ALPHA4_EXT
-pattern GL_ALPHA8 = 0x803C :: GlEnum -- deprecated, same as GL_ALPHA8_EXT
-pattern GL_ALPHA8_SNORM = 0x9014 :: GlEnum -- deprecated
-pattern GL_ALPHA8UI_EXT = 0x8D7E :: GlEnum -- deprecated
-pattern GL_ALPHA8I_EXT = 0x8D90 :: GlEnum -- deprecated
-pattern GL_ALPHA12 = 0x803D :: GlEnum -- deprecated, same as GL_ALPHA12_EXT
-pattern GL_ALPHA16 = 0x803E :: GlEnum -- deprecated, same as GL_ALPHA16_EXT
-pattern GL_ALPHA16_SNORM = 0x9018 :: GlEnum -- deprecated
-pattern GL_ALPHA16UI_EXT = 0x8D78 :: GlEnum -- deprecated
-pattern GL_ALPHA16I_EXT = 0x8D8A :: GlEnum -- deprecated
-pattern GL_ALPHA16F_ARB = 0x881C :: GlEnum -- deprecated, same as GL_ALPHA_FLOAT16_APPLE and GL_ALPHA_FLOAT16_ATI
-pattern GL_ALPHA32UI_EXT = 0x8D72 :: GlEnum -- deprecated
-pattern GL_ALPHA32I_EXT = 0x8D84 :: GlEnum -- deprecated
-pattern GL_ALPHA32F_ARB = 0x8816 :: GlEnum -- deprecated, same as GL_ALPHA_FLOAT32_APPLE and GL_ALPHA_FLOAT32_ATI
+pattern GL_ALPHA4 :: GlEnum n => n
+pattern GL_ALPHA4 = 0x803B -- deprecated, same as GL_ALPHA4_EXT
+pattern GL_ALPHA8 :: GlEnum n => n
+pattern GL_ALPHA8 = 0x803C -- deprecated, same as GL_ALPHA8_EXT
+pattern GL_ALPHA8_SNORM :: GlEnum n => n
+pattern GL_ALPHA8_SNORM = 0x9014 -- deprecated
+pattern GL_ALPHA8UI_EXT :: GlEnum n => n
+pattern GL_ALPHA8UI_EXT = 0x8D7E -- deprecated
+pattern GL_ALPHA8I_EXT :: GlEnum n => n
+pattern GL_ALPHA8I_EXT = 0x8D90 -- deprecated
+pattern GL_ALPHA12 :: GlEnum n => n
+pattern GL_ALPHA12 = 0x803D -- deprecated, same as GL_ALPHA12_EXT
+pattern GL_ALPHA16 :: GlEnum n => n
+pattern GL_ALPHA16 = 0x803E -- deprecated, same as GL_ALPHA16_EXT
+pattern GL_ALPHA16_SNORM :: GlEnum n => n
+pattern GL_ALPHA16_SNORM = 0x9018 -- deprecated
+pattern GL_ALPHA16UI_EXT :: GlEnum n => n
+pattern GL_ALPHA16UI_EXT = 0x8D78 -- deprecated
+pattern GL_ALPHA16I_EXT :: GlEnum n => n
+pattern GL_ALPHA16I_EXT = 0x8D8A -- deprecated
+pattern GL_ALPHA16F_ARB :: GlEnum n => n
+pattern GL_ALPHA16F_ARB = 0x881C -- deprecated, same as GL_ALPHA_FLOAT16_APPLE and GL_ALPHA_FLOAT16_ATI
+pattern GL_ALPHA32UI_EXT :: GlEnum n => n
+pattern GL_ALPHA32UI_EXT = 0x8D72 -- deprecated
+pattern GL_ALPHA32I_EXT :: GlEnum n => n
+pattern GL_ALPHA32I_EXT = 0x8D84 -- deprecated
+pattern GL_ALPHA32F_ARB :: GlEnum n => n
+pattern GL_ALPHA32F_ARB = 0x8816 -- deprecated, same as GL_ALPHA_FLOAT32_APPLE and GL_ALPHA_FLOAT32_ATI
 
 --
 -- Luminance
 --
 
-pattern GL_LUMINANCE4 = 0x803F :: GlEnum -- deprecated, same as GL_LUMINANCE4_EXT
-pattern GL_LUMINANCE8 = 0x8040 :: GlEnum -- deprecated, same as GL_LUMINANCE8_EXT
-pattern GL_LUMINANCE8_SNORM = 0x9015 :: GlEnum -- deprecated
-pattern GL_SLUMINANCE8 = 0x8C47 :: GlEnum -- deprecated, same as GL_SLUMINANCE8_EXT
-pattern GL_LUMINANCE8UI_EXT = 0x8D80 :: GlEnum -- deprecated
-pattern GL_LUMINANCE8I_EXT = 0x8D92 :: GlEnum -- deprecated
-pattern GL_LUMINANCE12 = 0x8041 :: GlEnum -- deprecated, same as GL_LUMINANCE12_EXT
-pattern GL_LUMINANCE16 = 0x8042 :: GlEnum -- deprecated, same as GL_LUMINANCE16_EXT
-pattern GL_LUMINANCE16_SNORM = 0x9019 :: GlEnum -- deprecated
-pattern GL_LUMINANCE16UI_EXT = 0x8D7A :: GlEnum -- deprecated
-pattern GL_LUMINANCE16I_EXT = 0x8D8C :: GlEnum -- deprecated
-pattern GL_LUMINANCE16F_ARB = 0x881E :: GlEnum -- deprecated, same as GL_LUMINANCE_FLOAT16_APPLE and GL_LUMINANCE_FLOAT16_ATI
-pattern GL_LUMINANCE32UI_EXT = 0x8D74 :: GlEnum -- deprecated
-pattern GL_LUMINANCE32I_EXT = 0x8D86 :: GlEnum -- deprecated
-pattern GL_LUMINANCE32F_ARB = 0x8818 :: GlEnum -- deprecated, same as GL_LUMINANCE_FLOAT32_APPLE and GL_LUMINANCE_FLOAT32_ATI
+pattern GL_LUMINANCE4 :: GlEnum n => n
+pattern GL_LUMINANCE4 = 0x803F -- deprecated, same as GL_LUMINANCE4_EXT
+pattern GL_LUMINANCE8 :: GlEnum n => n
+pattern GL_LUMINANCE8 = 0x8040 -- deprecated, same as GL_LUMINANCE8_EXT
+pattern GL_LUMINANCE8_SNORM :: GlEnum n => n
+pattern GL_LUMINANCE8_SNORM = 0x9015 -- deprecated
+pattern GL_SLUMINANCE8 :: GlEnum n => n
+pattern GL_SLUMINANCE8 = 0x8C47 -- deprecated, same as GL_SLUMINANCE8_EXT
+pattern GL_LUMINANCE8UI_EXT :: GlEnum n => n
+pattern GL_LUMINANCE8UI_EXT = 0x8D80 -- deprecated
+pattern GL_LUMINANCE8I_EXT :: GlEnum n => n
+pattern GL_LUMINANCE8I_EXT = 0x8D92 -- deprecated
+pattern GL_LUMINANCE12 :: GlEnum n => n
+pattern GL_LUMINANCE12 = 0x8041 -- deprecated, same as GL_LUMINANCE12_EXT
+pattern GL_LUMINANCE16 :: GlEnum n => n
+pattern GL_LUMINANCE16 = 0x8042 -- deprecated, same as GL_LUMINANCE16_EXT
+pattern GL_LUMINANCE16_SNORM :: GlEnum n => n
+pattern GL_LUMINANCE16_SNORM = 0x9019 -- deprecated
+pattern GL_LUMINANCE16UI_EXT :: GlEnum n => n
+pattern GL_LUMINANCE16UI_EXT = 0x8D7A -- deprecated
+pattern GL_LUMINANCE16I_EXT :: GlEnum n => n
+pattern GL_LUMINANCE16I_EXT = 0x8D8C -- deprecated
+pattern GL_LUMINANCE16F_ARB :: GlEnum n => n
+pattern GL_LUMINANCE16F_ARB = 0x881E -- deprecated, same as GL_LUMINANCE_FLOAT16_APPLE and GL_LUMINANCE_FLOAT16_ATI
+pattern GL_LUMINANCE32UI_EXT :: GlEnum n => n
+pattern GL_LUMINANCE32UI_EXT = 0x8D74 -- deprecated
+pattern GL_LUMINANCE32I_EXT :: GlEnum n => n
+pattern GL_LUMINANCE32I_EXT = 0x8D86 -- deprecated
+pattern GL_LUMINANCE32F_ARB :: GlEnum n => n
+pattern GL_LUMINANCE32F_ARB = 0x8818 -- deprecated, same as GL_LUMINANCE_FLOAT32_APPLE and GL_LUMINANCE_FLOAT32_ATI
 
 --
 -- Luminance/Alpha
 --
 
-pattern GL_LUMINANCE4_ALPHA4 = 0x8043 :: GlEnum -- deprecated, same as GL_LUMINANCE4_ALPHA4_EXT
-pattern GL_LUMINANCE6_ALPHA2 = 0x8044 :: GlEnum -- deprecated, same as GL_LUMINANCE6_ALPHA2_EXT
-pattern GL_LUMINANCE8_ALPHA8 = 0x8045 :: GlEnum -- deprecated, same as GL_LUMINANCE8_ALPHA8_EXT
-pattern GL_LUMINANCE8_ALPHA8_SNORM = 0x9016 :: GlEnum -- deprecated
-pattern GL_SLUMINANCE8_ALPHA8 = 0x8C45 :: GlEnum -- deprecated, same as GL_SLUMINANCE8_ALPHA8_EXT
-pattern GL_LUMINANCE_ALPHA8UI_EXT = 0x8D81 :: GlEnum -- deprecated
-pattern GL_LUMINANCE_ALPHA8I_EXT = 0x8D93 :: GlEnum -- deprecated
-pattern GL_LUMINANCE12_ALPHA4 = 0x8046 :: GlEnum -- deprecated, same as GL_LUMINANCE12_ALPHA4_EXT
-pattern GL_LUMINANCE12_ALPHA12 = 0x8047 :: GlEnum -- deprecated, same as GL_LUMINANCE12_ALPHA12_EXT
-pattern GL_LUMINANCE16_ALPHA16 = 0x8048 :: GlEnum -- deprecated, same as GL_LUMINANCE16_ALPHA16_EXT
-pattern GL_LUMINANCE16_ALPHA16_SNORM = 0x901A :: GlEnum -- deprecated
-pattern GL_LUMINANCE_ALPHA16UI_EXT = 0x8D7B :: GlEnum -- deprecated
-pattern GL_LUMINANCE_ALPHA16I_EXT = 0x8D8D :: GlEnum -- deprecated
-pattern GL_LUMINANCE_ALPHA16F_ARB = 0x881F :: GlEnum -- deprecated, same as GL_LUMINANCE_ALPHA_FLOAT16_APPLE and GL_LUMINANCE_ALPHA_FLOAT16_ATI
-pattern GL_LUMINANCE_ALPHA32UI_EXT = 0x8D75 :: GlEnum -- deprecated
-pattern GL_LUMINANCE_ALPHA32I_EXT = 0x8D87 :: GlEnum -- deprecated
-pattern GL_LUMINANCE_ALPHA32F_ARB = 0x8819 :: GlEnum -- deprecated, same as GL_LUMINANCE_ALPHA_FLOAT32_APPLE and GL_LUMINANCE_ALPHA_FLOAT32_ATI
+pattern GL_LUMINANCE4_ALPHA4 :: GlEnum n => n
+pattern GL_LUMINANCE4_ALPHA4 = 0x8043 -- deprecated, same as GL_LUMINANCE4_ALPHA4_EXT
+pattern GL_LUMINANCE6_ALPHA2 :: GlEnum n => n
+pattern GL_LUMINANCE6_ALPHA2 = 0x8044 -- deprecated, same as GL_LUMINANCE6_ALPHA2_EXT
+pattern GL_LUMINANCE8_ALPHA8 :: GlEnum n => n
+pattern GL_LUMINANCE8_ALPHA8 = 0x8045 -- deprecated, same as GL_LUMINANCE8_ALPHA8_EXT
+pattern GL_LUMINANCE8_ALPHA8_SNORM :: GlEnum n => n
+pattern GL_LUMINANCE8_ALPHA8_SNORM = 0x9016 -- deprecated
+pattern GL_SLUMINANCE8_ALPHA8 :: GlEnum n => n
+pattern GL_SLUMINANCE8_ALPHA8 = 0x8C45 -- deprecated, same as GL_SLUMINANCE8_ALPHA8_EXT
+pattern GL_LUMINANCE_ALPHA8UI_EXT :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA8UI_EXT = 0x8D81 -- deprecated
+pattern GL_LUMINANCE_ALPHA8I_EXT :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA8I_EXT = 0x8D93 -- deprecated
+pattern GL_LUMINANCE12_ALPHA4 :: GlEnum n => n
+pattern GL_LUMINANCE12_ALPHA4 = 0x8046 -- deprecated, same as GL_LUMINANCE12_ALPHA4_EXT
+pattern GL_LUMINANCE12_ALPHA12 :: GlEnum n => n
+pattern GL_LUMINANCE12_ALPHA12 = 0x8047 -- deprecated, same as GL_LUMINANCE12_ALPHA12_EXT
+pattern GL_LUMINANCE16_ALPHA16 :: GlEnum n => n
+pattern GL_LUMINANCE16_ALPHA16 = 0x8048 -- deprecated, same as GL_LUMINANCE16_ALPHA16_EXT
+pattern GL_LUMINANCE16_ALPHA16_SNORM :: GlEnum n => n
+pattern GL_LUMINANCE16_ALPHA16_SNORM = 0x901A -- deprecated
+pattern GL_LUMINANCE_ALPHA16UI_EXT :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA16UI_EXT = 0x8D7B -- deprecated
+pattern GL_LUMINANCE_ALPHA16I_EXT :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA16I_EXT = 0x8D8D -- deprecated
+pattern GL_LUMINANCE_ALPHA16F_ARB :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA16F_ARB = 0x881F -- deprecated, same as GL_LUMINANCE_ALPHA_FLOAT16_APPLE and GL_LUMINANCE_ALPHA_FLOAT16_ATI
+pattern GL_LUMINANCE_ALPHA32UI_EXT :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA32UI_EXT = 0x8D75 -- deprecated
+pattern GL_LUMINANCE_ALPHA32I_EXT :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA32I_EXT = 0x8D87 -- deprecated
+pattern GL_LUMINANCE_ALPHA32F_ARB :: GlEnum n => n
+pattern GL_LUMINANCE_ALPHA32F_ARB = 0x8819 -- deprecated, same as GL_LUMINANCE_ALPHA_FLOAT32_APPLE and GL_LUMINANCE_ALPHA_FLOAT32_ATI
 
 --
 -- Intensity
 --
 
-pattern GL_INTENSITY4 = 0x804A :: GlEnum -- deprecated, same as GL_INTENSITY4_EXT
-pattern GL_INTENSITY8 = 0x804B :: GlEnum -- deprecated, same as GL_INTENSITY8_EXT
-pattern GL_INTENSITY8_SNORM = 0x9017 :: GlEnum -- deprecated
-pattern GL_INTENSITY8UI_EXT = 0x8D7F :: GlEnum -- deprecated
-pattern GL_INTENSITY8I_EXT = 0x8D91 :: GlEnum -- deprecated
-pattern GL_INTENSITY12 = 0x804C :: GlEnum -- deprecated, same as GL_INTENSITY12_EXT
-pattern GL_INTENSITY16 = 0x804D :: GlEnum -- deprecated, same as GL_INTENSITY16_EXT
-pattern GL_INTENSITY16_SNORM = 0x901B :: GlEnum -- deprecated
-pattern GL_INTENSITY16UI_EXT = 0x8D79 :: GlEnum -- deprecated
-pattern GL_INTENSITY16I_EXT = 0x8D8B :: GlEnum -- deprecated
-pattern GL_INTENSITY16F_ARB = 0x881D :: GlEnum -- deprecated, same as GL_INTENSITY_FLOAT16_APPLE and GL_INTENSITY_FLOAT16_ATI
-pattern GL_INTENSITY32UI_EXT = 0x8D73 :: GlEnum -- deprecated
-pattern GL_INTENSITY32I_EXT = 0x8D85 :: GlEnum -- deprecated
-pattern GL_INTENSITY32F_ARB = 0x8817 :: GlEnum -- deprecated, same as GL_INTENSITY_FLOAT32_APPLE and GL_INTENSITY_FLOAT32_ATI
+pattern GL_INTENSITY4 :: GlEnum n => n
+pattern GL_INTENSITY4 = 0x804A -- deprecated, same as GL_INTENSITY4_EXT
+pattern GL_INTENSITY8 :: GlEnum n => n
+pattern GL_INTENSITY8 = 0x804B -- deprecated, same as GL_INTENSITY8_EXT
+pattern GL_INTENSITY8_SNORM :: GlEnum n => n
+pattern GL_INTENSITY8_SNORM = 0x9017 -- deprecated
+pattern GL_INTENSITY8UI_EXT :: GlEnum n => n
+pattern GL_INTENSITY8UI_EXT = 0x8D7F -- deprecated
+pattern GL_INTENSITY8I_EXT :: GlEnum n => n
+pattern GL_INTENSITY8I_EXT = 0x8D91 -- deprecated
+pattern GL_INTENSITY12 :: GlEnum n => n
+pattern GL_INTENSITY12 = 0x804C -- deprecated, same as GL_INTENSITY12_EXT
+pattern GL_INTENSITY16 :: GlEnum n => n
+pattern GL_INTENSITY16 = 0x804D -- deprecated, same as GL_INTENSITY16_EXT
+pattern GL_INTENSITY16_SNORM :: GlEnum n => n
+pattern GL_INTENSITY16_SNORM = 0x901B -- deprecated
+pattern GL_INTENSITY16UI_EXT :: GlEnum n => n
+pattern GL_INTENSITY16UI_EXT = 0x8D79 -- deprecated
+pattern GL_INTENSITY16I_EXT :: GlEnum n => n
+pattern GL_INTENSITY16I_EXT = 0x8D8B -- deprecated
+pattern GL_INTENSITY16F_ARB :: GlEnum n => n
+pattern GL_INTENSITY16F_ARB = 0x881D -- deprecated, same as GL_INTENSITY_FLOAT16_APPLE and GL_INTENSITY_FLOAT16_ATI
+pattern GL_INTENSITY32UI_EXT :: GlEnum n => n
+pattern GL_INTENSITY32UI_EXT = 0x8D73 -- deprecated
+pattern GL_INTENSITY32I_EXT :: GlEnum n => n
+pattern GL_INTENSITY32I_EXT = 0x8D85 -- deprecated
+pattern GL_INTENSITY32F_ARB :: GlEnum n => n
+pattern GL_INTENSITY32F_ARB = 0x8817 -- deprecated, same as GL_INTENSITY_FLOAT32_APPLE and GL_INTENSITY_FLOAT32_ATI
 
 --
 -- Generic compression
 --
 
-pattern GL_COMPRESSED_RED = 0x8225 :: GlEnum
-pattern GL_COMPRESSED_ALPHA = 0x84E9 :: GlEnum -- deprecated, same as GL_COMPRESSED_ALPHA_ARB
-pattern GL_COMPRESSED_LUMINANCE = 0x84EA :: GlEnum -- deprecated, same as GL_COMPRESSED_LUMINANCE_ARB
-pattern GL_COMPRESSED_SLUMINANCE = 0x8C4A :: GlEnum -- deprecated, same as GL_COMPRESSED_SLUMINANCE_EXT
-pattern GL_COMPRESSED_LUMINANCE_ALPHA = 0x84EB :: GlEnum -- deprecated, same as GL_COMPRESSED_LUMINANCE_ALPHA_ARB
-pattern GL_COMPRESSED_SLUMINANCE_ALPHA = 0x8C4B :: GlEnum -- deprecated, same as GL_COMPRESSED_SLUMINANCE_ALPHA_EXT
-pattern GL_COMPRESSED_INTENSITY = 0x84EC :: GlEnum -- deprecated, same as GL_COMPRESSED_INTENSITY_ARB
-pattern GL_COMPRESSED_RG = 0x8226 :: GlEnum
-pattern GL_COMPRESSED_RGB = 0x84ED :: GlEnum -- same as GL_COMPRESSED_RGB_ARB
-pattern GL_COMPRESSED_RGBA = 0x84EE :: GlEnum -- same as GL_COMPRESSED_RGBA_ARB
-pattern GL_COMPRESSED_SRGB = 0x8C48 :: GlEnum -- same as GL_COMPRESSED_SRGB_EXT
-pattern GL_COMPRESSED_SRGB_ALPHA = 0x8C49 :: GlEnum -- same as GL_COMPRESSED_SRGB_ALPHA_EXT
+pattern GL_COMPRESSED_RED :: GlEnum n => n
+pattern GL_COMPRESSED_RED = 0x8225
+pattern GL_COMPRESSED_ALPHA :: GlEnum n => n
+pattern GL_COMPRESSED_ALPHA = 0x84E9 -- deprecated, same as GL_COMPRESSED_ALPHA_ARB
+pattern GL_COMPRESSED_LUMINANCE :: GlEnum n => n
+pattern GL_COMPRESSED_LUMINANCE = 0x84EA -- deprecated, same as GL_COMPRESSED_LUMINANCE_ARB
+pattern GL_COMPRESSED_SLUMINANCE :: GlEnum n => n
+pattern GL_COMPRESSED_SLUMINANCE = 0x8C4A -- deprecated, same as GL_COMPRESSED_SLUMINANCE_EXT
+pattern GL_COMPRESSED_LUMINANCE_ALPHA :: GlEnum n => n
+pattern GL_COMPRESSED_LUMINANCE_ALPHA = 0x84EB -- deprecated, same as GL_COMPRESSED_LUMINANCE_ALPHA_ARB
+pattern GL_COMPRESSED_SLUMINANCE_ALPHA :: GlEnum n => n
+pattern GL_COMPRESSED_SLUMINANCE_ALPHA = 0x8C4B -- deprecated, same as GL_COMPRESSED_SLUMINANCE_ALPHA_EXT
+pattern GL_COMPRESSED_INTENSITY :: GlEnum n => n
+pattern GL_COMPRESSED_INTENSITY = 0x84EC -- deprecated, same as GL_COMPRESSED_INTENSITY_ARB
+pattern GL_COMPRESSED_RG :: GlEnum n => n
+pattern GL_COMPRESSED_RG = 0x8226
+pattern GL_COMPRESSED_RGB :: GlEnum n => n
+pattern GL_COMPRESSED_RGB = 0x84ED -- same as GL_COMPRESSED_RGB_ARB
+pattern GL_COMPRESSED_RGBA :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA = 0x84EE -- same as GL_COMPRESSED_RGBA_ARB
+pattern GL_COMPRESSED_SRGB :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB = 0x8C48 -- same as GL_COMPRESSED_SRGB_EXT
+pattern GL_COMPRESSED_SRGB_ALPHA :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA = 0x8C49 -- same as GL_COMPRESSED_SRGB_ALPHA_EXT
 
 --
 -- FXT1
 --
 
-pattern GL_COMPRESSED_RGB_FXT1_3DFX = 0x86B0 :: GlEnum -- deprecated
-pattern GL_COMPRESSED_RGBA_FXT1_3DFX = 0x86B1 :: GlEnum -- deprecated
+pattern GL_COMPRESSED_RGB_FXT1_3DFX :: GlEnum n => n
+pattern GL_COMPRESSED_RGB_FXT1_3DFX = 0x86B0 -- deprecated
+pattern GL_COMPRESSED_RGBA_FXT1_3DFX :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_FXT1_3DFX = 0x86B1 -- deprecated
 
 --
 -- S3TC/DXT/BC
 --
 
-pattern GL_COMPRESSED_RGB_S3TC_DXT1_EXT = 0x83F0 :: GlEnum
-pattern GL_COMPRESSED_RGBA_S3TC_DXT1_EXT = 0x83F1 :: GlEnum
-pattern GL_COMPRESSED_RGBA_S3TC_DXT3_EXT = 0x83F2 :: GlEnum
-pattern GL_COMPRESSED_RGBA_S3TC_DXT5_EXT = 0x83F3 :: GlEnum
+pattern GL_COMPRESSED_RGB_S3TC_DXT1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_RGB_S3TC_DXT1_EXT = 0x83F0
+pattern GL_COMPRESSED_RGBA_S3TC_DXT1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_S3TC_DXT1_EXT = 0x83F1
+pattern GL_COMPRESSED_RGBA_S3TC_DXT3_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_S3TC_DXT3_EXT = 0x83F2
+pattern GL_COMPRESSED_RGBA_S3TC_DXT5_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_S3TC_DXT5_EXT = 0x83F3
 
-pattern GL_COMPRESSED_SRGB_S3TC_DXT1_EXT = 0x8C4C :: GlEnum
-pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT = 0x8C4D :: GlEnum
-pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT = 0x8C4E :: GlEnum
-pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT = 0x8C4F :: GlEnum
+pattern GL_COMPRESSED_SRGB_S3TC_DXT1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_S3TC_DXT1_EXT = 0x8C4C
+pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT = 0x8C4D
+pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT = 0x8C4E
+pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT = 0x8C4F
 
-pattern GL_COMPRESSED_LUMINANCE_LATC1_EXT = 0x8C70 :: GlEnum
-pattern GL_COMPRESSED_LUMINANCE_ALPHA_LATC2_EXT = 0x8C72 :: GlEnum
-pattern GL_COMPRESSED_SIGNED_LUMINANCE_LATC1_EXT = 0x8C71 :: GlEnum
-pattern GL_COMPRESSED_SIGNED_LUMINANCE_ALPHA_LATC2_EXT = 0x8C73 :: GlEnum
+pattern GL_COMPRESSED_LUMINANCE_LATC1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_LUMINANCE_LATC1_EXT = 0x8C70
+pattern GL_COMPRESSED_LUMINANCE_ALPHA_LATC2_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_LUMINANCE_ALPHA_LATC2_EXT = 0x8C72
+pattern GL_COMPRESSED_SIGNED_LUMINANCE_LATC1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SIGNED_LUMINANCE_LATC1_EXT = 0x8C71
+pattern GL_COMPRESSED_SIGNED_LUMINANCE_ALPHA_LATC2_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SIGNED_LUMINANCE_ALPHA_LATC2_EXT = 0x8C73
 
-pattern GL_COMPRESSED_RED_RGTC1 = 0x8DBB :: GlEnum -- same as GL_COMPRESSED_RED_RGTC1_EXT
-pattern GL_COMPRESSED_RG_RGTC2 = 0x8DBD :: GlEnum -- same as GL_COMPRESSED_RG_RGTC2_EXT
-pattern GL_COMPRESSED_SIGNED_RED_RGTC1 = 0x8DBC :: GlEnum -- same as GL_COMPRESSED_SIGNED_RED_RGTC1_EXT
-pattern GL_COMPRESSED_SIGNED_RG_RGTC2 = 0x8DBE :: GlEnum -- same as GL_COMPRESSED_SIGNED_RG_RGTC2_EXT
+pattern GL_COMPRESSED_RED_RGTC1 :: GlEnum n => n
+pattern GL_COMPRESSED_RED_RGTC1 = 0x8DBB -- same as GL_COMPRESSED_RED_RGTC1_EXT
+pattern GL_COMPRESSED_RG_RGTC2 :: GlEnum n => n
+pattern GL_COMPRESSED_RG_RGTC2 = 0x8DBD -- same as GL_COMPRESSED_RG_RGTC2_EXT
+pattern GL_COMPRESSED_SIGNED_RED_RGTC1 :: GlEnum n => n
+pattern GL_COMPRESSED_SIGNED_RED_RGTC1 = 0x8DBC -- same as GL_COMPRESSED_SIGNED_RED_RGTC1_EXT
+pattern GL_COMPRESSED_SIGNED_RG_RGTC2 :: GlEnum n => n
+pattern GL_COMPRESSED_SIGNED_RG_RGTC2 = 0x8DBE -- same as GL_COMPRESSED_SIGNED_RG_RGTC2_EXT
 
-pattern GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT = 0x8E8E :: GlEnum -- same as GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB
-pattern GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT = 0x8E8F :: GlEnum -- same as GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB
-pattern GL_COMPRESSED_RGBA_BPTC_UNORM = 0x8E8C :: GlEnum -- same as GL_COMPRESSED_RGBA_BPTC_UNORM_ARB 
-pattern GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM = 0x8E8D :: GlEnum -- same as GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB
+pattern GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT :: GlEnum n => n
+pattern GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT = 0x8E8E -- same as GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB
+pattern GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT :: GlEnum n => n
+pattern GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT = 0x8E8F -- same as GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB
+pattern GL_COMPRESSED_RGBA_BPTC_UNORM :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_BPTC_UNORM = 0x8E8C -- same as GL_COMPRESSED_RGBA_BPTC_UNORM_ARB 
+pattern GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM = 0x8E8D -- same as GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB
 
 --
 -- ETC
 --
 
-pattern GL_ETC1_RGB8_OES = 0x8D64 :: GlEnum
+pattern GL_ETC1_RGB8_OES :: GlEnum n => n
+pattern GL_ETC1_RGB8_OES = 0x8D64
 
-pattern GL_COMPRESSED_RGB8_ETC2 = 0x9274 :: GlEnum
-pattern GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 = 0x9276 :: GlEnum
-pattern GL_COMPRESSED_RGBA8_ETC2_EAC = 0x9278 :: GlEnum
+pattern GL_COMPRESSED_RGB8_ETC2 :: GlEnum n => n
+pattern GL_COMPRESSED_RGB8_ETC2 = 0x9274
+pattern GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 :: GlEnum n => n
+pattern GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 = 0x9276
+pattern GL_COMPRESSED_RGBA8_ETC2_EAC :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA8_ETC2_EAC = 0x9278
 
-pattern GL_COMPRESSED_SRGB8_ETC2 = 0x9275 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2 = 0x9277 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC = 0x9279 :: GlEnum
+pattern GL_COMPRESSED_SRGB8_ETC2 :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ETC2 = 0x9275
+pattern GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2 :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2 = 0x9277
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC = 0x9279
 
-pattern GL_COMPRESSED_R11_EAC = 0x9270 :: GlEnum
-pattern GL_COMPRESSED_RG11_EAC = 0x9272 :: GlEnum
-pattern GL_COMPRESSED_SIGNED_R11_EAC = 0x9271 :: GlEnum
-pattern GL_COMPRESSED_SIGNED_RG11_EAC = 0x9273 :: GlEnum
+pattern GL_COMPRESSED_R11_EAC :: GlEnum n => n
+pattern GL_COMPRESSED_R11_EAC = 0x9270
+pattern GL_COMPRESSED_RG11_EAC :: GlEnum n => n
+pattern GL_COMPRESSED_RG11_EAC = 0x9272
+pattern GL_COMPRESSED_SIGNED_R11_EAC :: GlEnum n => n
+pattern GL_COMPRESSED_SIGNED_R11_EAC = 0x9271
+pattern GL_COMPRESSED_SIGNED_RG11_EAC :: GlEnum n => n
+pattern GL_COMPRESSED_SIGNED_RG11_EAC = 0x9273
 
 --
 -- PVRTC
 --
 
-pattern GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG = 0x8C01 :: GlEnum
-pattern GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG = 0x8C00 :: GlEnum
-pattern GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG = 0x8C03 :: GlEnum
-pattern GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG = 0x8C02 :: GlEnum
-pattern GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG = 0x9137 :: GlEnum
-pattern GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG = 0x9138 :: GlEnum
-pattern GL_COMPRESSED_SRGB_PVRTC_2BPPV1_EXT = 0x8A54 :: GlEnum
-pattern GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT = 0x8A55 :: GlEnum
-pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1_EXT = 0x8A56 :: GlEnum
-pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT = 0x8A57 :: GlEnum
-pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV2_IMG = 0x93F0 :: GlEnum
-pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2_IMG = 0x93F1 :: GlEnum
+pattern GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG :: GlEnum n => n
+pattern GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG = 0x8C01
+pattern GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG :: GlEnum n => n
+pattern GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG = 0x8C00
+pattern GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG = 0x8C03
+pattern GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG = 0x8C02
+pattern GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG = 0x9137
+pattern GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG = 0x9138
+pattern GL_COMPRESSED_SRGB_PVRTC_2BPPV1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_PVRTC_2BPPV1_EXT = 0x8A54
+pattern GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT = 0x8A55
+pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1_EXT = 0x8A56
+pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT = 0x8A57
+pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV2_IMG :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV2_IMG = 0x93F0
+pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2_IMG :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV2_IMG = 0x93F1
 
 --
 -- ASTC
 --
 
-pattern GL_COMPRESSED_RGBA_ASTC_4x4_KHR = 0x93B0 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_5x4_KHR = 0x93B1 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_5x5_KHR = 0x93B2 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_6x5_KHR = 0x93B3 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_6x6_KHR = 0x93B4 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_8x5_KHR = 0x93B5 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_8x6_KHR = 0x93B6 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_8x8_KHR = 0x93B7 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_10x5_KHR = 0x93B8 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_10x6_KHR = 0x93B9 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_10x8_KHR = 0x93BA :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_10x10_KHR = 0x93BB :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_12x10_KHR = 0x93BC :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_12x12_KHR = 0x93BD :: GlEnum
+pattern GL_COMPRESSED_RGBA_ASTC_4x4_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_4x4_KHR = 0x93B0
+pattern GL_COMPRESSED_RGBA_ASTC_5x4_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_5x4_KHR = 0x93B1
+pattern GL_COMPRESSED_RGBA_ASTC_5x5_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_5x5_KHR = 0x93B2
+pattern GL_COMPRESSED_RGBA_ASTC_6x5_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_6x5_KHR = 0x93B3
+pattern GL_COMPRESSED_RGBA_ASTC_6x6_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_6x6_KHR = 0x93B4
+pattern GL_COMPRESSED_RGBA_ASTC_8x5_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_8x5_KHR = 0x93B5
+pattern GL_COMPRESSED_RGBA_ASTC_8x6_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_8x6_KHR = 0x93B6
+pattern GL_COMPRESSED_RGBA_ASTC_8x8_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_8x8_KHR = 0x93B7
+pattern GL_COMPRESSED_RGBA_ASTC_10x5_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_10x5_KHR = 0x93B8
+pattern GL_COMPRESSED_RGBA_ASTC_10x6_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_10x6_KHR = 0x93B9
+pattern GL_COMPRESSED_RGBA_ASTC_10x8_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_10x8_KHR = 0x93BA
+pattern GL_COMPRESSED_RGBA_ASTC_10x10_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_10x10_KHR = 0x93BB
+pattern GL_COMPRESSED_RGBA_ASTC_12x10_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_12x10_KHR = 0x93BC
+pattern GL_COMPRESSED_RGBA_ASTC_12x12_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_12x12_KHR = 0x93BD
 
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR = 0x93D0 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR = 0x93D1 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR = 0x93D2 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR = 0x93D3 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR = 0x93D4 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR = 0x93D5 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR = 0x93D6 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR = 0x93D7 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR = 0x93D8 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR = 0x93D9 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR = 0x93DA :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR = 0x93DB :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR = 0x93DC :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR = 0x93DD :: GlEnum
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR = 0x93D0
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR = 0x93D1
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR = 0x93D2
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR = 0x93D3
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR = 0x93D4
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR = 0x93D5
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR = 0x93D6
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR = 0x93D7
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR = 0x93D8
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR = 0x93D9
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR = 0x93DA
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR = 0x93DB
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR = 0x93DC
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR = 0x93DD
 
-pattern GL_COMPRESSED_RGBA_ASTC_3x3x3_OES = 0x93C0 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_4x3x3_OES = 0x93C1 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_4x4x3_OES = 0x93C2 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_4x4x4_OES = 0x93C3 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_5x4x4_OES = 0x93C4 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_5x5x4_OES = 0x93C5 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_5x5x5_OES = 0x93C6 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_6x5x5_OES = 0x93C7 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_6x6x5_OES = 0x93C8 :: GlEnum
-pattern GL_COMPRESSED_RGBA_ASTC_6x6x6_OES = 0x93C9 :: GlEnum
+pattern GL_COMPRESSED_RGBA_ASTC_3x3x3_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_3x3x3_OES = 0x93C0
+pattern GL_COMPRESSED_RGBA_ASTC_4x3x3_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_4x3x3_OES = 0x93C1
+pattern GL_COMPRESSED_RGBA_ASTC_4x4x3_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_4x4x3_OES = 0x93C2
+pattern GL_COMPRESSED_RGBA_ASTC_4x4x4_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_4x4x4_OES = 0x93C3
+pattern GL_COMPRESSED_RGBA_ASTC_5x4x4_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_5x4x4_OES = 0x93C4
+pattern GL_COMPRESSED_RGBA_ASTC_5x5x4_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_5x5x4_OES = 0x93C5
+pattern GL_COMPRESSED_RGBA_ASTC_5x5x5_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_5x5x5_OES = 0x93C6
+pattern GL_COMPRESSED_RGBA_ASTC_6x5x5_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_6x5x5_OES = 0x93C7
+pattern GL_COMPRESSED_RGBA_ASTC_6x6x5_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_6x6x5_OES = 0x93C8
+pattern GL_COMPRESSED_RGBA_ASTC_6x6x6_OES :: GlEnum n => n
+pattern GL_COMPRESSED_RGBA_ASTC_6x6x6_OES = 0x93C9
 
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_3x3x3_OES = 0x93E0 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x3x3_OES = 0x93E1 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x3_OES = 0x93E2 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x4_OES = 0x93E3 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4x4_OES = 0x93E4 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x4_OES = 0x93E5 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x5_OES = 0x93E6 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5x5_OES = 0x93E7 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x5_OES = 0x93E8 :: GlEnum
-pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x6_OES = 0x93E9 :: GlEnum
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_3x3x3_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_3x3x3_OES = 0x93E0
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x3x3_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x3x3_OES = 0x93E1
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x3_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x3_OES = 0x93E2
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x4_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4x4_OES = 0x93E3
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4x4_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4x4_OES = 0x93E4
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x4_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x4_OES = 0x93E5
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x5_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5x5_OES = 0x93E6
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5x5_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5x5_OES = 0x93E7
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x5_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x5_OES = 0x93E8
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x6_OES :: GlEnum n => n
+pattern GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6x6_OES = 0x93E9
 
 --
 -- ATC
 --
 
-pattern GL_ATC_RGB_AMD = 0x8C92 :: GlEnum
-pattern GL_ATC_RGBA_EXPLICIT_ALPHA_AMD = 0x8C93 :: GlEnum
-pattern GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD = 0x87EE :: GlEnum
+pattern GL_ATC_RGB_AMD :: GlEnum n => n
+pattern GL_ATC_RGB_AMD = 0x8C92
+pattern GL_ATC_RGBA_EXPLICIT_ALPHA_AMD :: GlEnum n => n
+pattern GL_ATC_RGBA_EXPLICIT_ALPHA_AMD = 0x8C93
+pattern GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD :: GlEnum n => n
+pattern GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD = 0x87EE
 
 --
 -- Palletized (combined palette)
 --
 
-pattern GL_PALETTE4_RGB8_OES = 0x8B90 :: GlEnum
-pattern GL_PALETTE4_RGBA8_OES = 0x8B91 :: GlEnum
-pattern GL_PALETTE4_R5_G6_B5_OES = 0x8B92 :: GlEnum
-pattern GL_PALETTE4_RGBA4_OES = 0x8B93 :: GlEnum
-pattern GL_PALETTE4_RGB5_A1_OES = 0x8B94 :: GlEnum
-pattern GL_PALETTE8_RGB8_OES = 0x8B95 :: GlEnum
-pattern GL_PALETTE8_RGBA8_OES = 0x8B96 :: GlEnum
-pattern GL_PALETTE8_R5_G6_B5_OES = 0x8B97 :: GlEnum
-pattern GL_PALETTE8_RGBA4_OES = 0x8B98 :: GlEnum
-pattern GL_PALETTE8_RGB5_A1_OES = 0x8B99 :: GlEnum
+pattern GL_PALETTE4_RGB8_OES :: GlEnum n => n
+pattern GL_PALETTE4_RGB8_OES = 0x8B90
+pattern GL_PALETTE4_RGBA8_OES :: GlEnum n => n
+pattern GL_PALETTE4_RGBA8_OES = 0x8B91
+pattern GL_PALETTE4_R5_G6_B5_OES :: GlEnum n => n
+pattern GL_PALETTE4_R5_G6_B5_OES = 0x8B92
+pattern GL_PALETTE4_RGBA4_OES :: GlEnum n => n
+pattern GL_PALETTE4_RGBA4_OES = 0x8B93
+pattern GL_PALETTE4_RGB5_A1_OES :: GlEnum n => n
+pattern GL_PALETTE4_RGB5_A1_OES = 0x8B94
+pattern GL_PALETTE8_RGB8_OES :: GlEnum n => n
+pattern GL_PALETTE8_RGB8_OES = 0x8B95
+pattern GL_PALETTE8_RGBA8_OES :: GlEnum n => n
+pattern GL_PALETTE8_RGBA8_OES = 0x8B96
+pattern GL_PALETTE8_R5_G6_B5_OES :: GlEnum n => n
+pattern GL_PALETTE8_R5_G6_B5_OES = 0x8B97
+pattern GL_PALETTE8_RGBA4_OES :: GlEnum n => n
+pattern GL_PALETTE8_RGBA4_OES = 0x8B98
+pattern GL_PALETTE8_RGB5_A1_OES :: GlEnum n => n
+pattern GL_PALETTE8_RGB5_A1_OES = 0x8B99
 
 --
 -- Palletized (separate palette)
 --
 
-pattern GL_COLOR_INDEX1_EXT = 0x80E2 :: GlEnum -- deprecated
-pattern GL_COLOR_INDEX2_EXT = 0x80E3 :: GlEnum -- deprecated
-pattern GL_COLOR_INDEX4_EXT = 0x80E4 :: GlEnum -- deprecated
-pattern GL_COLOR_INDEX8_EXT = 0x80E5 :: GlEnum -- deprecated
-pattern GL_COLOR_INDEX12_EXT = 0x80E6 :: GlEnum -- deprecated
-pattern GL_COLOR_INDEX16_EXT = 0x80E7 :: GlEnum -- deprecated
+pattern GL_COLOR_INDEX1_EXT :: GlEnum n => n
+pattern GL_COLOR_INDEX1_EXT = 0x80E2 -- deprecated
+pattern GL_COLOR_INDEX2_EXT :: GlEnum n => n
+pattern GL_COLOR_INDEX2_EXT = 0x80E3 -- deprecated
+pattern GL_COLOR_INDEX4_EXT :: GlEnum n => n
+pattern GL_COLOR_INDEX4_EXT = 0x80E4 -- deprecated
+pattern GL_COLOR_INDEX8_EXT :: GlEnum n => n
+pattern GL_COLOR_INDEX8_EXT = 0x80E5 -- deprecated
+pattern GL_COLOR_INDEX12_EXT :: GlEnum n => n
+pattern GL_COLOR_INDEX12_EXT = 0x80E6 -- deprecated
+pattern GL_COLOR_INDEX16_EXT :: GlEnum n => n
+pattern GL_COLOR_INDEX16_EXT = 0x80E7 -- deprecated
 
 --
 -- Depth/stencil
 --
 
-pattern GL_DEPTH_COMPONENT16 = 0x81A5 :: GlEnum -- same as GL_DEPTH_COMPONENT16_SGIX and GL_DEPTH_COMPONENT16_ARB
-pattern GL_DEPTH_COMPONENT24 = 0x81A6 :: GlEnum -- same as GL_DEPTH_COMPONENT24_SGIX and GL_DEPTH_COMPONENT24_ARB
-pattern GL_DEPTH_COMPONENT32 = 0x81A7 :: GlEnum -- same as GL_DEPTH_COMPONENT32_SGIX and GL_DEPTH_COMPONENT32_ARB and GL_DEPTH_COMPONENT32_OES
-pattern GL_DEPTH_COMPONENT32F = 0x8CAC :: GlEnum -- same as GL_DEPTH_COMPONENT32F_ARB
-pattern GL_DEPTH_COMPONENT32F_NV = 0x8DAB :: GlEnum -- note that this is different from GL_DEPTH_COMPONENT32F
-pattern GL_STENCIL_INDEX1 = 0x8D46 :: GlEnum -- same as GL_STENCIL_INDEX1_EXT
-pattern GL_STENCIL_INDEX4 = 0x8D47 :: GlEnum -- same as GL_STENCIL_INDEX4_EXT
-pattern GL_STENCIL_INDEX8 = 0x8D48 :: GlEnum -- same as GL_STENCIL_INDEX8_EXT
-pattern GL_STENCIL_INDEX16 = 0x8D49 :: GlEnum -- same as GL_STENCIL_INDEX16_EXT
-pattern GL_DEPTH24_STENCIL8 = 0x88F0 :: GlEnum -- same as GL_DEPTH24_STENCIL8_EXT and GL_DEPTH24_STENCIL8_OES
-pattern GL_DEPTH32F_STENCIL8 = 0x8CAD :: GlEnum -- same as GL_DEPTH32F_STENCIL8_ARB
-pattern GL_DEPTH32F_STENCIL8_NV = 0x8DAC :: GlEnum -- note that this is different from GL_DEPTH32F_STENCIL8
+pattern GL_DEPTH_COMPONENT16 :: GlEnum n => n
+pattern GL_DEPTH_COMPONENT16 = 0x81A5 -- same as GL_DEPTH_COMPONENT16_SGIX and GL_DEPTH_COMPONENT16_ARB
+pattern GL_DEPTH_COMPONENT24 :: GlEnum n => n
+pattern GL_DEPTH_COMPONENT24 = 0x81A6 -- same as GL_DEPTH_COMPONENT24_SGIX and GL_DEPTH_COMPONENT24_ARB
+pattern GL_DEPTH_COMPONENT32 :: GlEnum n => n
+pattern GL_DEPTH_COMPONENT32 = 0x81A7 -- same as GL_DEPTH_COMPONENT32_SGIX and GL_DEPTH_COMPONENT32_ARB and GL_DEPTH_COMPONENT32_OES
+pattern GL_DEPTH_COMPONENT32F :: GlEnum n => n
+pattern GL_DEPTH_COMPONENT32F = 0x8CAC -- same as GL_DEPTH_COMPONENT32F_ARB
+pattern GL_DEPTH_COMPONENT32F_NV :: GlEnum n => n
+pattern GL_DEPTH_COMPONENT32F_NV = 0x8DAB -- note that this is different from GL_DEPTH_COMPONENT32F
+pattern GL_STENCIL_INDEX1 :: GlEnum n => n
+pattern GL_STENCIL_INDEX1 = 0x8D46 -- same as GL_STENCIL_INDEX1_EXT
+pattern GL_STENCIL_INDEX4 :: GlEnum n => n
+pattern GL_STENCIL_INDEX4 = 0x8D47 -- same as GL_STENCIL_INDEX4_EXT
+pattern GL_STENCIL_INDEX8 :: GlEnum n => n
+pattern GL_STENCIL_INDEX8 = 0x8D48 -- same as GL_STENCIL_INDEX8_EXT
+pattern GL_STENCIL_INDEX16 :: GlEnum n => n
+pattern GL_STENCIL_INDEX16 = 0x8D49 -- same as GL_STENCIL_INDEX16_EXT
+pattern GL_DEPTH24_STENCIL8 :: GlEnum n => n
+pattern GL_DEPTH24_STENCIL8 = 0x88F0 -- same as GL_DEPTH24_STENCIL8_EXT and GL_DEPTH24_STENCIL8_OES
+pattern GL_DEPTH32F_STENCIL8 :: GlEnum n => n
+pattern GL_DEPTH32F_STENCIL8 = 0x8CAD -- same as GL_DEPTH32F_STENCIL8_ARB
+pattern GL_DEPTH32F_STENCIL8_NV :: GlEnum n => n
+pattern GL_DEPTH32F_STENCIL8_NV = 0x8DAC -- note that this is different from GL_DEPTH32F_STENCIL8
 
-glGetFormatFromInternalFormat :: GlEnum -> GlEnum
+glGetFormatFromInternalFormat :: GlEnum n => n -> n
 glGetFormatFromInternalFormat = \case
   --
   -- 8 bits per component
@@ -729,7 +1049,7 @@ glGetFormatFromInternalFormat = \case
 
   v -> throwGlConstantException $ "Invalid GL internal format: " ++ show v
 
-glGetTypeFromInternalFormat :: GlEnum -> GlEnum
+glGetTypeFromInternalFormat :: GlEnum n => n -> n
 glGetTypeFromInternalFormat = \case
   --
   -- 8 bits per component
@@ -981,7 +1301,7 @@ glGetTypeFromInternalFormat = \case
 
   v -> throwGlConstantException $ "Invalid GL internal format: " ++ show v
 
-glGetTypeSizeFromType :: GlEnum -> Word32
+glGetTypeSizeFromType :: (GlEnum n, Num s) => n -> s
 glGetTypeSizeFromType = \case
   x | x `elem` [
       GL_BYTE,
@@ -1020,24 +1340,29 @@ glGetTypeSizeFromType = \case
 
 type GlFormatSizeFlags = Word32
 
-pattern GL_FORMAT_SIZE_PACKED_BIT = 0x01 :: GlFormatSizeFlags
-pattern GL_FORMAT_SIZE_COMPRESSED_BIT = 0x02 :: GlFormatSizeFlags
-pattern GL_FORMAT_SIZE_PALETTIZED_BIT = 0x04 :: GlFormatSizeFlags
-pattern GL_FORMAT_SIZE_DEPTH_BIT = 0x08 :: GlFormatSizeFlags
-pattern GL_FORMAT_SIZE_STENCIL_BIT = 0x10 :: GlFormatSizeFlags
+pattern GL_FORMAT_SIZE_PACKED_BIT :: GlFormatSizeFlags
+pattern GL_FORMAT_SIZE_PACKED_BIT = 0x01
+pattern GL_FORMAT_SIZE_COMPRESSED_BIT :: GlFormatSizeFlags
+pattern GL_FORMAT_SIZE_COMPRESSED_BIT = 0x02
+pattern GL_FORMAT_SIZE_PALETTIZED_BIT :: GlFormatSizeFlags
+pattern GL_FORMAT_SIZE_PALETTIZED_BIT = 0x04
+pattern GL_FORMAT_SIZE_DEPTH_BIT :: GlFormatSizeFlags
+pattern GL_FORMAT_SIZE_DEPTH_BIT = 0x08
+pattern GL_FORMAT_SIZE_STENCIL_BIT :: GlFormatSizeFlags
+pattern GL_FORMAT_SIZE_STENCIL_BIT = 0x10
 
-data GlFormatSize =
+data GlFormatSize s =
   GlFormatSize {
     glFormatSize'flags :: GlFormatSizeFlags,
-    glFormatSize'paletteSizeInBits :: Word32,
-    glFormatSize'blockSizeInBits :: Word32,
-    glFormatSize'blockWidth :: Word32,
-    glFormatSize'blockHeight :: Word32,
-    glFormatSize'blockDepth :: Word32
+    glFormatSize'paletteSizeInBits :: s,
+    glFormatSize'blockSizeInBits :: s,
+    glFormatSize'blockWidth :: s,
+    glFormatSize'blockHeight :: s,
+    glFormatSize'blockDepth :: s
   }
   deriving (Show)
 
-glGetFormatSize :: GlEnum -> GlFormatSize
+glGetFormatSize :: (GlEnum n, Num s) => n -> GlFormatSize s
 glGetFormatSize = \case
 
   --
