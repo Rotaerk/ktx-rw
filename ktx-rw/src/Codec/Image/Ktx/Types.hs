@@ -4,7 +4,7 @@ import Data.Word
 import qualified Data.Set as Set
 import Data.ByteString (ByteString)
 
-import Codec.Image.Ktx.GLConstants
+import Codec.Image.Ktx.GlConstants
 
 data Header =
   Header {

@@ -1,13 +1,10 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
-{-# OPTIONS_GHC -Wno-missing-pattern-synonym-signatures #-}
 
 -- This module is a port of the gl_format.h file included under /ktx-rw/refsrc.
 
-module Codec.Image.Ktx.GLConstants where
+module Codec.Image.Ktx.GlConstants where
 
 import Control.Exception
 import Data.Bits
@@ -15,13 +12,13 @@ import Data.Word
 
 type GlEnum n = (Num n, Eq n, Show n)
 
-newtype GlConstantException = GlConstantException String deriving (Eq, Show, Read)
+newtype GLConstantException = GLConstantException String deriving (Eq, Show, Read)
 
-instance Exception GlConstantException where
-  displayException (GlConstantException message) = message
+instance Exception GLConstantException where
+  displayException (GLConstantException message) = message
 
-throwGlConstantException :: String -> a
-throwGlConstantException = throw . GlConstantException
+throwGLConstantException :: String -> a
+throwGLConstantException = throw . GLConstantException
 
 {-
 ================================================================================================================================
@@ -797,8 +794,8 @@ pattern GL_DEPTH32F_STENCIL8 = 0x8CAD -- same as GL_DEPTH32F_STENCIL8_ARB
 pattern GL_DEPTH32F_STENCIL8_NV :: GlEnum n => n
 pattern GL_DEPTH32F_STENCIL8_NV = 0x8DAC -- note that this is different from GL_DEPTH32F_STENCIL8
 
-glGetFormatFromInternalFormat :: GlEnum n => n -> n
-glGetFormatFromInternalFormat = \case
+getGlFormatFromInternalFormat :: GlEnum n => n -> n
+getGlFormatFromInternalFormat = \case
   --
   -- 8 bits per component
   --
@@ -1047,10 +1044,10 @@ glGetFormatFromInternalFormat = \case
   GL_DEPTH32F_STENCIL8 -> GL_DEPTH_STENCIL
   GL_DEPTH32F_STENCIL8_NV -> GL_DEPTH_STENCIL
 
-  v -> throwGlConstantException $ "Invalid GL internal format: " ++ show v
+  v -> throwGLConstantException $ "Invalid GL internal format: " ++ show v
 
-glGetTypeFromInternalFormat :: GlEnum n => n -> n
-glGetTypeFromInternalFormat = \case
+getGlTypeFromInternalFormat :: GlEnum n => n -> n
+getGlTypeFromInternalFormat = \case
   --
   -- 8 bits per component
   --
@@ -1299,10 +1296,10 @@ glGetTypeFromInternalFormat = \case
   GL_DEPTH32F_STENCIL8 -> GL_FLOAT_32_UNSIGNED_INT_24_8_REV
   GL_DEPTH32F_STENCIL8_NV -> GL_FLOAT_32_UNSIGNED_INT_24_8_REV
 
-  v -> throwGlConstantException $ "Invalid GL internal format: " ++ show v
+  v -> throwGLConstantException $ "Invalid GL internal format: " ++ show v
 
-glGetTypeSizeFromType :: (GlEnum n, Num s) => n -> s
-glGetTypeSizeFromType = \case
+getGlTypeSize :: (GlEnum n, Num s) => n -> s
+getGlTypeSize = \case
   x | x `elem` [
       GL_BYTE,
       GL_UNSIGNED_BYTE,
@@ -1336,7 +1333,7 @@ glGetTypeSizeFromType = \case
       GL_FLOAT_32_UNSIGNED_INT_24_8_REV
     ] -> 4
 
-  v -> throwGlConstantException $ "Invalid GL type: " ++ show v
+  v -> throwGLConstantException $ "Invalid GL type: " ++ show v
 
 type GlFormatSizeFlags = Word32
 
@@ -1362,8 +1359,8 @@ data GlFormatSize s =
   }
   deriving (Show)
 
-glGetFormatSize :: (GlEnum n, Num s) => n -> GlFormatSize s
-glGetFormatSize = \case
+getGlFormatSize :: (GlEnum n, Num s) => n -> GlFormatSize s
+getGlFormatSize = \case
 
   --
   -- 8 bits per component

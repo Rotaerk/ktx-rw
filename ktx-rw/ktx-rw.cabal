@@ -14,7 +14,8 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:
-    Codec.Image.Ktx.GLConstants
+    Codec.Image.Ktx.GlConstants
+    Codec.Image.Ktx.VkConstants
     Codec.Image.Ktx.Types
     Codec.Image.Ktx.Read
     Control.Monad.BufferWriter
