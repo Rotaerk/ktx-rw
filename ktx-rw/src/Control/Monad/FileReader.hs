@@ -15,6 +15,7 @@ module Control.Monad.FileReader (
 import Control.Exception
 import Control.Monad.Catch
 import Control.Monad.Fail
+import Control.Monad.IO.Unlift
 import Control.Monad.Reader
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
@@ -66,6 +67,9 @@ buildFileReaderT = FileReaderT . ReaderT
 
 runFileReaderT :: FileReaderT m a -> Handle -> m a
 runFileReaderT = runReaderT . unFileReaderT
+
+instance MonadUnliftIO m => MonadUnliftIO (FileReaderT m) where
+  withRunInIO = wrappedWithRunInIO FileReaderT unFileReaderT
 
 instance (MonadIO m, MonadThrow m) => MonadFileReader (FileReaderT m) where
   getFileSize = buildFileReaderT $ liftIO . hFileSize

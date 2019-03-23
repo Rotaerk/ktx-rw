@@ -30,6 +30,7 @@ import Control.Monad.Catch
 import Control.Monad.Fail
 import Control.Monad.FileReader
 import Control.Monad.IO.Class
+import Control.Monad.IO.Unlift
 import Control.Monad.Loops
 import Control.Monad.Reader
 import Data.Attoparsec.ByteString
@@ -66,6 +67,9 @@ runKtxBodyReaderT = runReaderT . unKtxBodyReaderT
 
 instance MonadTrans KtxBodyReaderT where
   lift = KtxBodyReaderT . lift
+
+instance MonadUnliftIO m => MonadUnliftIO (KtxBodyReaderT m) where
+  withRunInIO = wrappedWithRunInIO KtxBodyReaderT unKtxBodyReaderT
 
 instance MonadFileReader m => MonadFileReader (KtxBodyReaderT m) where
   getFileSize = lift getFileSize
