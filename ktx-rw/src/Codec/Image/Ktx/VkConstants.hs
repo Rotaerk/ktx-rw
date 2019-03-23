@@ -7,8 +7,11 @@
 module Codec.Image.Ktx.VkConstants where
 
 import Codec.Image.Ktx.GlConstants
+
 import Control.Exception
+import Control.Monad
 import Data.Bits
+import Data.Composition
 import Data.Word
 
 type VkFormat n = (Num n, Eq n, Show n)
@@ -388,8 +391,8 @@ getVkFormatFromGlTypeAndFormat ::
   (GlEnum g, VkFormat v) =>
   g -> -- GL type
   g -> -- GL format
-  v
-getVkFormatFromGlTypeAndFormat = \case
+  Maybe v
+getVkFormatFromGlTypeAndFormat = mfilter (/= VK_FORMAT_UNDEFINED) .: Just .: \case
 
   --
   -- 8 bits per component
@@ -663,8 +666,8 @@ getVkFormatFromGlType ::
   g -> -- GL type
   n -> -- # components
   Bool -> -- is normalized?
-  v
-getVkFormatFromGlType = \case
+  Maybe v
+getVkFormatFromGlType = mfilter (/= VK_FORMAT_UNDEFINED) .:. Just .:. \case
   --
   -- 8 bits per component
   --
@@ -812,8 +815,8 @@ getVkFormatFromGlType = \case
 
   _ -> const . const $ VK_FORMAT_UNDEFINED
 
-getVkFormatFromGlInternalFormat :: (GlEnum g, VkFormat v) => g -> v
-getVkFormatFromGlInternalFormat = \case
+getVkFormatFromGlInternalFormat :: (GlEnum g, VkFormat v) => g -> Maybe v
+getVkFormatFromGlInternalFormat = mfilter (/= VK_FORMAT_UNDEFINED) . Just . \case
 
   --
   -- 8 bits per component
@@ -1088,7 +1091,7 @@ data VkFormatSize s =
   }
   deriving (Show)
 
-getVkFormatSize :: (VkFormat v, Num s) => v -> VkFormatSize s
+getVkFormatSize :: (VkFormat v, Num s, Eq s) => v -> VkFormatSize s
 getVkFormatSize = \case
 
   VK_FORMAT_R4G4_UNORM_PACK8 ->
@@ -1765,12 +1768,4 @@ getVkFormatSize = \case
       vkFormatSize'blockDepth = 1
     }
 
-  _ ->
-    VkFormatSize {
-      vkFormatSize'flags = 0,
-      vkFormatSize'paletteSizeInBits = 0,
-      vkFormatSize'blockSizeInBits = 0 * 8,
-      vkFormatSize'blockWidth = 1,
-      vkFormatSize'blockHeight = 1,
-      vkFormatSize'blockDepth = 1
-    }
+  x -> error $ "Unexpected VkFormat value: " ++ show x

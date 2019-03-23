@@ -25,6 +25,7 @@ library
   build-depends:
     attoparsec,
     bytestring,
+    composition,
     containers,
     directory,
     exceptions,
