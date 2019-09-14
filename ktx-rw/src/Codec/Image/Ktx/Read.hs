@@ -90,7 +90,7 @@ throwKtxFileReadException :: MonadThrow m => String -> m a
 throwKtxFileReadException = throwM . KtxFileReadException
 
 type SimpleBufferRegion = (Size, Offset)
-type NonArrayCubeMapBufferRegion = (Size, Offset, Offset, Offset, Offset, Offset, Offset)
+type NonArrayCubeMapBufferRegion = (Size, [Offset])
 
 data BufferRegions =
   SimpleBufferRegions [SimpleBufferRegion] |
@@ -159,8 +159,7 @@ readTextureDataIntoBuffer = do
   if isNonArrayCubeMap h then
     fmap NonArrayCubeMapBufferRegions . replicateM numMipmapLevels $ do
       imageSize <- readImageSize
-      let r = readImageDataIntoBuffer imageSize
-      (imageSize,,,,,,) <$> r <*> r <*> r <*> r <*> r <*> r
+      (imageSize,) <$> replicateM 6 (readImageDataIntoBuffer imageSize)
   else
     fmap SimpleBufferRegions . replicateM numMipmapLevels $ do
       imageSize <- readImageSize

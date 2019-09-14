@@ -2,7 +2,7 @@
 with pkgs;
 let
   inherit (lib) makeLibraryPath;
-  hs = haskell.packages.ghc863;
+  hs = haskell.packages.ghc864;
   tools = [
     hs.ghc
     hs.cabal-install
@@ -10,10 +10,12 @@ let
   ];
   libraries = [
   ];
+  libraryPath = "${makeLibraryPath libraries}";
 in
   pkgs.runCommand "shell" {
     buildInputs = tools ++ libraries;
     shellHook = ''
-      LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${makeLibraryPath libraries}"
+      export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${libraryPath}"
+      export LIBRARY_PATH="${libraryPath}"
     '';
   } ""
