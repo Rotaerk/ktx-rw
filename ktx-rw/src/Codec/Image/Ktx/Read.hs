@@ -6,6 +6,7 @@
 module Codec.Image.Ktx.Read (
   module Codec.Image.Ktx.Types,
   readKtxFile,
+  readKtxFileHeader,
   KtxBodyReaderT(),
   buildKtxBodyReaderT,
   runKtxBodyReaderT,
@@ -41,20 +42,37 @@ import Data.Functor
 import Data.Word
 import Foreign.Ptr
 import Foreign.Storable
-import System.IO
+import System.IO hiding (withBinaryFile)
+import UnliftIO.IO
 
 import Prelude hiding (take)
 
-readKtxFile :: FilePath -> (Size -> IO (Ptr Word8)) -> (Ptr Word8 -> IO ()) -> IO (Header, Metadata, Buffer, BufferRegions)
-readKtxFile filePath allocateBuffer freeBuffer =
-  withBinaryFile filePath ReadMode . runFileReaderT $
-  readAndCheckIdentifier >> readHeader >>= runKtxBodyReaderT (do
-    metadata <- readMetadata
-    textureDataSize <- getTextureDataSize
-    bracketOnError (liftIO $ allocateBuffer textureDataSize) (liftIO . freeBuffer) $ \((,textureDataSize) -> buffer) -> do
-      bufferRegions <- evalBufferWriterT readTextureDataIntoBuffer buffer 0
-      ask <&> (, metadata, buffer, bufferRegions)
-  )
+readKtxFile ::
+  (MonadUnliftIO m, MonadThrow m) =>
+  FilePath ->
+  KtxBodyReaderT (FileReaderT m) metadata ->
+  (
+    Header ->
+    metadata ->
+    Size ->
+    (Ptr Word8 -> KtxBodyReaderT (FileReaderT m) BufferRegions) ->
+    KtxBodyReaderT (FileReaderT m) r
+  ) ->
+  m r
+readKtxFile filePath handleMetadata readTextureData =
+  withBinaryFile filePath ReadMode . runFileReaderT $ do
+    readAndCheckIdentifier
+    header <- readHeader
+    runKtxBodyReaderT `flip` header $ do
+      metadata <- handleMetadata
+      textureDataSize <- getTextureDataSize
+      handlePosn <- getHandlePosnInFile
+      readTextureData header metadata textureDataSize $ \bufferPtr -> do
+        setHandlePosnInFile handlePosn
+        evalBufferWriterT readTextureDataIntoBuffer (bufferPtr, textureDataSize) 0
+
+readKtxFileHeader :: FilePath -> IO Header
+readKtxFileHeader filePath = readKtxFile filePath skipMetadata $ \header () _ _ -> return header
 
 newtype KtxBodyReaderT m a = KtxBodyReaderT { unKtxBodyReaderT :: ReaderT Header m a }
   deriving (Functor, Applicative, Monad, MonadFail, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadReader Header)
