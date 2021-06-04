@@ -16,7 +16,6 @@ module Control.Monad.BufferWriter (
 
 import Control.Exception
 import Control.Monad.Catch
-import Control.Monad.Fail
 import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.State

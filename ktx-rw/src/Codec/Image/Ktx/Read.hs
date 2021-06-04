@@ -28,7 +28,6 @@ import Control.Exception hiding (bracketOnError)
 import Control.Monad
 import Control.Monad.BufferWriter
 import Control.Monad.Catch
-import Control.Monad.Fail
 import Control.Monad.FileReader
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift

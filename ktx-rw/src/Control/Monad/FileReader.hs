@@ -14,7 +14,6 @@ module Control.Monad.FileReader (
 
 import Control.Exception
 import Control.Monad.Catch
-import Control.Monad.Fail
 import Control.Monad.IO.Unlift
 import Control.Monad.Reader
 import Data.ByteString (ByteString)
